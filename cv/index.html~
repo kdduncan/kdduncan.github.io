@@ -1,6 +1,6 @@
- <!DOCTYPE html>
 <html>
 <head>
+<title>Kevin Duncan's Webpage</title>
 <style>
 ul#menu {
     padding: 0;
@@ -23,21 +23,7 @@ ul#menu li a:hover {
 }
 </style>
 </head>
-
-<title>Kevin Duncan's Webpage</title>
-</head>
 <body>
-
-<h1>Kevin Duncan's Webpage</h1>
-<ul id="menu">
-  <li><a href="http://kdduncan.github.io/cv/">CV</a></li>
-</ul>  
-
-<h2>About </h2>
-<p>My name is Kevin Duncan, a second year PhD Candidate in Economics at Iowa State University. <br> My research for the past two years with Peter Orazem and Georgeanne Artz has involved looking at the impacts of state policies on relative economic growth using differences between counties on state borders.
-</p>
-
-<p> My research interests are in labor and public economics, as well as in theoretical econometrics. I am also an avid dog owner, biker, and weekend griller.</p>
 
 <h2>Education</h2>
 <p><i>2013-Current</i> PhD Candidate, Economics. Iowa State University</p>
@@ -54,7 +40,7 @@ County-Pair Study." <i>Masters Thesis, est. Summer 2015</i></p>
 <h2> Presentations</h2>
 <p>Midwest Economics Association, "Do State Business Climate Indicators Explain Relative Economic Growth at State Borders?" March 2014</p>
 
+
 </body>
 </html> 
-
 
