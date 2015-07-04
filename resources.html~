@@ -8,14 +8,17 @@
 <div class="content">
 
 <div id="header">
-<h1>Kevin D. Duncan's Webpage</h1>
+<h1>Kevin D. Duncan</h1>
 </div>
 
 <div id="nav">
 <ul id="menu">
-  <li><b><a href="../index.html">Home</a></b></li> / 
-  <li><b><a href="../cv/Duncan_CV.pdf">CV</a></b></li> /
-  <li><b><a href="./index.html">Resources For Students</a></b></li>
+   <li><b><a href="./index.html">Home</a></b></li> /
+   <li><b><a href="./about.html">About</a></b></li> /
+   <li><b><a href="./Duncan_CV.pdf">CV</a></b></li> /
+   <li><b><a href="./papers.html">My Work</a></b></li> /
+   <li><b><a href="./teaching.html">Teaching</a></b></li> /
+   <li><b><a href="./resources.html">Resources For Students</a></b></li>
 </ul> 
 </div>
 

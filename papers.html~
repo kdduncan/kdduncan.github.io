@@ -13,19 +13,20 @@
  <div id="nav">
   <ul id="menu">
    <li><b><a href="./index.html">Home</a></b></li> /
-   <li><b><a href="about.html">About</a></b></li> /
-   <li><b><a href="Duncan_CV.pdf">CV</a></b></li> /
-   <li><b><a href="papers.html">My Work</a></b></li> /
-   <li><b><a href="teaching.html">Teaching</a></b></li> /
-   <li><b><a href="resources.html">Resources For Students</a></b></li>
+   <li><b><a href="./Duncan_CV.pdf">CV</a></b></li> /
+   <li><b><a href="./papers.html">My Work</a></b></li> /
+   <li><b><a href="./teaching.html">Teaching</a></b></li> /
+   <li><b><a href="./resources.html">Resources For Students</a></b></li>
   </ul>  
  </div>
 
  <hr>
 
  <div id="section">
-  <h2>Welcome!</h2>
-  <p>This is my personal website, which provides links to my research, data sets, and other professional undertakings. You will also find additional information about me, my (currently limited) teaching, and some resources for prospective students who might stumble upon this website by accident</p>
+  <h2>Working Papers</h2>
+
+  <h2>Research in Progress</h2>
+
   </div>
 
  <div id="footer">
@@ -39,5 +40,4 @@
 
 </body>
 </html> 
-
 
