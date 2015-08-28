@@ -13,6 +13,7 @@
  <div id="nav">
   <ul id="menu">
    <li><b><a href="./index.html">Home</a></b></li> /
+   <li><b><a href="./about.html">About</a></b></li> /
    <li><b><a href="./Duncan_CV.pdf">CV</a></b></li> /
    <li><b><a href="./papers.html">My Work</a></b></li> /
    <li><b><a href="./teaching.html">Teaching</a></b></li> /
