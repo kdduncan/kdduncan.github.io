@@ -1,0 +1,91 @@
+\documentclass[11pt]{article}
+
+\usepackage{kantlipsum}   %% only for demo
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{marvosym}
+\usepackage{graphicx}
+
+
+\pagestyle{empty}
+
+\usepackage[scale=0.775]{geometry}
+\setlength{\parindent}{0pt}
+\addtolength{\parskip}{6pt}
+\def\firstname{Kevin}
+\def\familyname{Duncan}
+\def\FileAuthor{\firstname \familyname}
+\def\FileTitle{\firstname \familyname's cover letter}
+\def\FileSubject{Cover letter}
+\def\FileKeyWords{\firstname \familyname, Cover letter}
+               
+\renewcommand{\ttdefault}{pcr}
+               
+\usepackage{url}
+\urlstyle{tt}
+\ifpdf
+               \usepackage[pdftex,pdfborder=0,breaklinks,baseurl=http://,pdfpagemode=None,pdfstartview=XYZ,pdfstartpage=1]{hyperref}
+\hypersetup{
+  pdfauthor   = \FileAuthor,%
+  pdftitle    = \FileTitle,%
+  pdfsubject  = \FileSubject,%
+  pdfkeywords = \FileKeyWords,%
+  pdfcreator  = \LaTeX,%
+  pdfproducer = \LaTeX}
+\else
+\usepackage[dvips]{hyperref}
+\fi
+               
+               
+\begin{document}
+\sffamily   % for use with a résumé using sans serif fonts;
+            %\rmfamily  % for use with a résumé using serif fonts;
+\hfill%
+\begin{minipage}[t]{.6\textwidth}
+\raggedleft%
+{\bfseries Kevin D. Duncan}\\[.35ex]
+\small\itshape%
+5116 Schubert St.\\
+Ames, IA 50014\\[.35ex]
+\Telefon~(978) 390-3459\\
+\Letter~\href{mailto:kdduncan@iastate.edu}{kdduncan@iastate.edu}
+\end{minipage}\\[1em]
+%
+\begin{minipage}[t]{.4\textwidth}
+\raggedright%
+{\bfseries [College Name]}\\[.35ex]
+\small\itshape%
+street and number\\
+postcode city
+\end{minipage}
+\hfill % US style
+%\\[1em] % UK style
+\begin{minipage}[t]{.4\textwidth}
+\raggedleft % US style
+\today
+%April 6, 2006 % US informal style
+%05/04/2006 % UK formal style
+
+\end{minipage}\\[2em]
+\raggedright
+Dear Sir or Madam:\\[1.5em]
+%
+I am writing to apply to the [Position] in Economics at [College Name] for the Summer of 2015. I am a current PhD student in Economics at Iowa State University about to enter my third year with a focus on applied microeconomics and econometrics. I was accepted into Iowa State's graduate program as a Masters student in the Fall of 2012 but upgraded into the PhD program before finishing a thesis. While doing required graduate coursework I sought out research opportunities, and as a result plan to complete a Masters degree this summer even though it is not required by the Doctorate program of study.
+
+Due to being a Graduate student completing course work towards my degree I have relatively limited teaching experience. As an undergraduate I was a tutor for the George Washington University Economics Department where I tutored students in Introductory and Intermediate Macro and Microeconomics, and International Trade. Many students juggled internships and course work, and as a result I would work with students to schedule often atypically early or late hours to meet their schedules and help improve tutee's understanding of economics.
+
+At Iowa State University I regularly ran a review session after weekly quizzes for an Introduction to Microeconomics class. I was also provided opportunities to do stand alone lecturing for an Economics of Dsicrimination class on topics relating to sorting both in employment and neighborhoods. These opportunities have continued to improve my ability to speek and elucidate economics topics to students.
+
+I have further devoted myself to working to improve my peers outcome, starting up a Graduate Student Seminar series to help students gain important presenting experience before going on the job market, and serving on the Economics Department's Computer Committee, co-authoring grants to improve computer technology for graduate students. I continually try to improve the quality of education for students at all stages of learning that I have had the priviledge to interact with. This is a habit I hope to bring to [College] and the classroom. I hope to bring this gumption and drive this Summer.
+               
+%Yours sincerely,\\[2em] % if the opening is "Dear Mr(s) Doe,"
+Yours faithfully,\\[2em] % if the opening is "Dear Sir or Madam,"
+%
+%\includegraphics[scale=0.75]{signature_blue}\\
+{\bfseries Kevin D. Duncan}\\
+%
+\vfill%
+{\slshape Enclosure}
+{\slshape Attachment: curriculum vit\ae{}}
+               \end{document}

@@ -1,0 +1,143 @@
+% LaTeX Curriculum Vitae Template
+%
+% Copyright (C) 2004-2009 Jason Blevins <jrblevin@sdf.lonestar.org>
+% http://jblevins.org/projects/cv-template/
+%
+% You may use use this document as a template to create your own CV
+% and you may redistribute the source code freely. No attribution is
+% required in any resulting documents. I do ask that you please leave
+% this notice and the above URL in the source code if you choose to
+% redistribute this file.
+
+\documentclass[letterpaper]{article}
+
+\usepackage{hyperref}
+\usepackage{geometry}
+
+% Comment the following lines to use the default Computer Modern font
+% instead of the Palatino font provided by the mathpazo package.
+% Remove the 'osf' bit if you don't like the old style figures.
+\usepackage[T1]{fontenc}
+\usepackage[sc,osf]{mathpazo}
+
+% Set your name here
+\def\name{Kevin D. Duncan}
+
+% Replace this with a link to your CV if you like, or set it empty
+% (as in \def\footerlink{}) to remove the link in the footer:
+\def\footerlink{http://jblevins.org/projects/cv-template/}
+
+% The following metadata will show up in the PDF properties
+\hypersetup{
+  colorlinks = true,
+  urlcolor = black,
+  pdfauthor = {\name},
+  pdfkeywords = {economics, statistics},
+  pdftitle = {\name: Curriculum Vitae},
+  pdfsubject = {Curriculum Vitae},
+  pdfpagemode = UseNone
+}
+
+\geometry{
+  body={6.5in, 8.5in},
+  left=1.0in,
+  top=1.25in
+}
+
+
+% Customize page headers
+\pagestyle{myheadings}
+\markright{\name}
+\thispagestyle{empty}
+
+% Custom section fonts
+\usepackage{sectsty}
+\sectionfont{\sffamily\mdseries\Large}
+\subsectionfont{\sffamily\mdseries\itshape\large}
+
+\usepackage{enumitem}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection}{1em}{}[{\titlerule[0.8pt]}]
+
+% Other possible font commands include:
+% \ttfamily for teletype,
+% \sffamily for sans serif,
+% \bfseries for bold,
+% \scshape for small caps,
+% \normalsize, \large, \Large, \LARGE sizes.
+
+% Don't indent paragraphs.
+\setlength\parindent{0em}
+
+% Make lists without bullets
+\renewenvironment{itemize}{
+  \begin{list}{}{
+    \setlength{\leftmargin}{0em}
+  }
+}{
+  \end{list}
+}
+
+\newcommand{\degree}[3]{#1,\ #2\quad#3\par}
+
+\setlist[itemize]{leftmargin=*}
+
+\begin{document}
+
+% Place name at left
+{\huge \name}
+
+% Alternatively, print name centered and bold:
+%\centerline{\huge \bf \name}
+
+\vspace{0.25in}
+
+\begin{minipage}{\linewidth}
+  \begin{tabular}{llllll}
+    Phone: & (978) 390-3459 & 
+    Email: & \href{mailto:kdduncan@iastate.edu}{\tt kdduncan@iastate.edu} & 
+    Homepage: & \href{kdduncan.github.io/}{\tt kdduncan.github.io/} \\
+  \end{tabular}
+\end{minipage}
+
+\section*{Qualifications Summary}
+
+Economics PhD with research in econometric theory and applied microeconomics. Experience implementing both tall and wide data driven projects in R and Stata. Advanced knowledge of statistical theory and implementation of machine learning techniques.
+
+\section*{Education}
+
+\begin{tabular}{@{}llll}
+(Expected) Dec. 2019  & Ph.D. &Economics &Iowa State University \\
+2015 & M.S. &Economics &Iowa State University \\
+2011 & B.S. &Economics \& Public Policy &The George Washington University
+\end{tabular}
+
+
+\section*{Experience}
+\begin{itemize}
+\item Estimated the impact of the troubled asset relief program on business dynamics using bank call sheet data, requiring regularized regression for variable selection over hundreds of available covariates. 
+\item Developed joint hypothesis tests for panel data with serially correlated errors with large numbers of inconsistent parameter estimation relative to the sample size.
+\item Utilized R and Stata to construct estimators and carry out large data driven projects that included both many observations or covariates.
+\item Forecasted local economic growth using state climate business indices. Responded to reviewer comments and generate published peer reviewed work.
+\end{itemize}
+
+\section*{Publications \& Working Papers}
+
+\begin{itemize}
+\item ``Do State Business Climate Indicators Explain Relative Economic Growth at State Borders?'' \textit{with Georgeanne Artz, Peter Orazem, and Arthur Hall}, Journal of Regional Science, Vol. 56, No. 3, 2016, pp. 395-419
+\item ``The Troubled Asset Relief Program's Effect on Firm Entry over the Business Cycle''
+\item ``Linear Hypothesis Tests over Fixed Effects with Serially Correlated Panels''
+\item ``Impact of Taxes on Firm Location Along State Borders,'' \textit{with Georgeanne Artz and Peter Orazem}
+\end{itemize}
+
+\section*{Teaching \& Presentations}
+\begin{tabular}{@{}llll}
+2018 & Adjunct Instructor & Des Moines Area Community College & Ankeny IA \\
+\end{tabular}
+\begin{itemize}
+\item 2019 Midwest Economics Association, 2016 Midwest Economics Association, 2015 Southern Economics Association, Missouri Valley Economics Association, 2014 Midwest Economics Association
+\end{itemize}
+
+\end{document}

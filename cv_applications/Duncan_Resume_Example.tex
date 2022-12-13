@@ -1,0 +1,152 @@
+% LaTeX Curriculum Vitae Template
+%
+% Copyright (C) 2004-2009 Jason Blevins <jrblevin@sdf.lonestar.org>
+% http://jblevins.org/projects/cv-template/
+%
+% You may use use this document as a template to create your own CV
+% and you may redistribute the source code freely. No attribution is
+% required in any resulting documents. I do ask that you please leave
+% this notice and the above URL in the source code if you choose to
+% redistribute this file.
+
+\documentclass[letterpaper]{article}
+
+\usepackage{hyperref}
+\usepackage{geometry}
+
+% Comment the following lines to use the default Computer Modern font
+% instead of the Palatino font provided by the mathpazo package.
+% Remove the 'osf' bit if you don't like the old style figures.
+\usepackage[T1]{fontenc}
+\usepackage[sc,osf]{mathpazo}
+
+% Set your name here
+\def\name{Kevin D. Duncan}
+
+% Replace this with a link to your CV if you like, or set it empty
+% (as in \def\footerlink{}) to remove the link in the footer:
+\def\footerlink{http://jblevins.org/projects/cv-template/}
+
+% The following metadata will show up in the PDF properties
+\hypersetup{
+  colorlinks = true,
+  urlcolor = black,
+  pdfauthor = {\name},
+  pdfkeywords = {economics, statistics},
+  pdftitle = {\name: Curriculum Vitae},
+  pdfsubject = {Curriculum Vitae},
+  pdfpagemode = UseNone
+}
+
+\geometry{
+  body={6.5in, 8.5in},
+  left=0.5in,
+  right=0.5in,
+  top=0.5in
+}
+
+
+% Customize page headers
+\pagestyle{myheadings}
+\markright{\name}
+\thispagestyle{empty}
+
+% Custom section fonts
+\usepackage{sectsty}
+\sectionfont{\sffamily\mdseries\Large}
+\subsectionfont{\sffamily\mdseries\itshape\large}
+
+\usepackage{enumitem}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection}{1em}{}[{\titlerule[0.8pt]}]
+
+% Other possible font commands include:
+% \ttfamily for teletype,
+% \sffamily for sans serif,
+% \bfseries for bold,
+% \scshape for small caps,
+% \normalsize, \large, \Large, \LARGE sizes.
+
+% Don't indent paragraphs.
+\setlength\parindent{0em}
+
+\renewcommand\labelenumi{}
+
+% Make lists without bullets
+\renewenvironment{itemize}{
+  \begin{list}{}{
+    \setlength{\leftmargin}{0em}
+  }
+}{
+  \end{list}
+}
+
+
+\newcommand{\degree}[3]{#1,\ #2\quad#3\par}
+
+\setlist[itemize]{leftmargin=*}
+
+\begin{document}
+
+% Place name at left
+{\huge \name} \makebox[.65\textwidth][r]{\begin{minipage}{0.45\textwidth}
+  \begin{tabular}{ll} \\
+    Phone: & (XXX) XXX-XXXX\\
+    Email: & \href{mailto:XXXX@fhfa.gov}{\tt XXXX@XXXX.xxx} \\
+    Homepage: & \href{kdduncan.github.io/}{\tt kdduncan.github.io/} \\
+    Last updated: & \today \\
+  \end{tabular}
+\end{minipage}}
+
+% Alternatively, print name centered and bold:
+%\centerline{\huge \bf \name}
+
+\vspace{0.0in}
+
+%\begin{minipage}{0.45\linewidth}
+%  \href{http://www.unc.edu/}{Iowa State University} \\
+%  Department of Economics \\
+%  Heady Hall \\
+%  Ames IA, 50014
+%\end{minipage}
+
+
+
+\section*{Employment}
+
+\begin{tabular}{@{}llll}
+  Sep. 2021 - \textit{current}  & Senior Economist & Credit Risk Modeling Branch, Federal Housing Finance Agency \\
+  July 2020 - Aug. 2021  & Economist & Credit Risk Modeling Branch, Federal Housing Finance Agency \\
+ 
+\end{tabular}
+
+\section*{Education}
+
+\begin{tabular}{@{}llll}
+  2020  & Ph.D. & Economics &Iowa State University \\
+    2015 &M.Sc. & Economics &Iowa State University \\
+  2011 & B.Sc. & Economics \& Political Science & The George Washington University
+\end{tabular}
+
+\section*{Experience}
+\subsection*{Federal Housing Finance Agency}
+\begin{itemize}
+\item Led examination of FHLBanks collateral and securities valuation and haircut models, unsecured counterparty models, and member credit risk models, including credit union, bank, and insurance company probability of default models.
+\item Issued technical findings for improvement in FHLBank credit and collateral models, model risk management, and policies and procedures.
+\item Conducted research into Value-at-Risk (VaR) estimation techniques, including technical issues in time series and panel data estimation of VaR, including estimation method comparisons and issues with simulation code in R.
+\item Spearheaded the overhaul of a quarterly member credit report requiring SQL and Stata integration.
+\item Ongoing research into the use of state-space methods to estimate VaR and Expected Shortfall using Bayesian methods in Stan.
+\end{itemize}
+\subsection*{Iowa State University}
+\begin{itemize}
+\item Completed research in the causal impacts of the Troubled Asset Relief Program on county level establishment entry, exit, employment expansion, and employment contraction using synthetic control, interactive effect difference-in-differences, and stepdown hypothesis testing.
+\item Developed a novel joint hypothesis test for fixed effects when the dimension of the number of tested restrictions grows with the sample size under the presence of serial correlation.
+\item Used ArcGIS to match every accident in Vermont from 2016 through 2018 to the nearest message board, estimated causal impacts of displayed messages using regression discontinuity designs in Stata.
+\item Published an article evaluating the forecast performance of state level business climate indices as published by think tanks and professional organizations on future county and state level growth using a border-difference estimator.
+\item Taught two sections of Econ 101 at a local Community College (Des Moines Area Community College)
+\end{itemize}
+
+
+\end{document}
