@@ -46,3 +46,78 @@ a {
     font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
     text-decoration: none;
 }
+
+/* Sailing page improvements */
+.sailing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+.sailing-card {
+    background: #fdfdfd;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sailing-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border-color: #b0c4de;
+}
+
+.sailing-card h3 {
+    margin-top: 0;
+    color: #1c3d5a;
+    border-bottom: 1px solid #eef2f5;
+    padding-bottom: 8px;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+.sailing-card h4 {
+    margin-top: 15px;
+    margin-bottom: 5px;
+    color: #2c5282;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+.sailing-card ul {
+    padding-left: 20px;
+    margin: 8px 0;
+}
+
+.sailing-card li {
+    margin-bottom: 6px;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+.sailing-card a {
+    color: #3182ce;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.sailing-card a:hover {
+    text-decoration: underline;
+    color: #2b6cb0;
+}
+
+/* For full width elements or alert boxes on sailing page */
+.info-banner {
+    background-color: #ebf8ff;
+    border-left: 4px solid #3182ce;
+    color: #2b6cb0;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 0 4px 4px 0;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+.info-banner p {
+    margin: 0;
+}
+
