@@ -1,0 +1,4258 @@
+/**
+ * Beneteau 331 Sailboat Docking Simulator - Universal Bundle
+ * Runs seamlessly over both file:/// and http:// protocols without CORS restrictions.
+ */
+(function() {
+  'use strict';
+
+// ==========================================
+// MODULE: Vector2.js
+// ==========================================
+/**
+ * 2D Vector mathematics utility class.
+ */
+class Vector2 {
+  constructor(x = 0, y = 0) {
+    this.x = x;
+    this.y = y;
+  }
+
+  set(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+
+  clone() {
+    return new Vector2(this.x, this.y);
+  }
+
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    return this;
+  }
+
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+  }
+
+  static add(a, b) {
+    return new Vector2(a.x + b.x, a.y + b.y);
+  }
+
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+  }
+
+  static sub(a, b) {
+    return new Vector2(a.x - b.x, a.y - b.y);
+  }
+
+  multiplyScalar(s) {
+    this.x *= s;
+    this.y *= s;
+    return this;
+  }
+
+  static multiplyScalar(v, s) {
+    return new Vector2(v.x * s, v.y * s);
+  }
+
+  divideScalar(s) {
+    if (s !== 0) {
+      this.x /= s;
+      this.y /= s;
+    }
+    return this;
+  }
+
+  static divideScalar(v, s) {
+    if (s !== 0) {
+      return new Vector2(v.x / s, v.y / s);
+    }
+    return new Vector2(0, 0);
+  }
+
+  length() {
+    return Math.hypot(this.x, this.y);
+  }
+
+  lengthSq() {
+    return this.x * this.x + this.y * this.y;
+  }
+
+  normalize() {
+    const len = this.length();
+    if (len > 1e-6) {
+      this.x /= len;
+      this.y /= len;
+    } else {
+      this.x = 0;
+      this.y = 0;
+    }
+    return this;
+  }
+
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
+  }
+
+  /**
+   * 2D Cross product (wedge product scalar): a.x * b.y - a.y * b.x
+   */
+  cross(v) {
+    return this.x * v.y - this.y * v.x;
+  }
+
+  static cross(a, b) {
+    return a.x * b.y - a.y * b.x;
+  }
+
+  distanceTo(v) {
+    return Math.hypot(this.x - v.x, this.y - v.y);
+  }
+
+  angle() {
+    // Angle in radians from +X axis
+    return Math.atan2(this.y, this.x);
+  }
+
+  /**
+   * Rotates this vector by angle (radians) counter-clockwise
+   */
+  rotate(angle) {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const x = this.x * cos - this.y * sin;
+    const y = this.x * sin + this.y * cos;
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+
+  static rotate(v, angle) {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return new Vector2(
+      v.x * cos - v.y * sin,
+      v.x * sin + v.y * cos
+    );
+  }
+}
+
+
+// ==========================================
+// MODULE: config.js
+// ==========================================
+/**
+ * Configuration and physical specifications for the Beneteau 331 Sailboat
+ * and the slip with short port finger pier and 4 pilings.
+ */
+
+const KNOTS_TO_MS = 0.514444;
+const MS_TO_KNOTS = 1 / KNOTS_TO_MS;
+const RHO_WATER = 1025; // kg/m^3 (seawater)
+const RHO_AIR = 1.225;  // kg/m^3 (air)
+
+const BOAT_SPECS = {
+  name: "Beneteau 331 (Oceanis 331)",
+  loa: 10.34,       // Length Overall: 33' 11" (meters)
+  lwl: 9.30,        // Length Waterline: 30' 6" (meters)
+  beam: 3.42,       // Beam: 11' 3" (meters)
+  draft: 1.65,      // Draft: 5' 5" (meters)
+  mass: 5068,       // Displacement: 11,173 lbs (kg)
+  inertia: 42000,   // Yaw moment of inertia (kg * m^2)
+
+  // Center of Lateral Resistance (CLR) and Center of Effort (CE) relative to CM (0,0)
+  clrOffset: -0.2,  // CLR slightly aft of CM (meters)
+  ceOffset: 0.65,   // Windage center of effort forward of CM due to high bow freeboard (meters)
+  windageAreaFront: 6.8, // m^2 (frontal profile: hull + cabin + mast)
+  windageAreaSide: 24.5, // m^2 (lateral profile: high topsides, cabin trunk, rigging)
+
+  // Beta 25 Marine Diesel Engine
+  engine: {
+    name: "Beta 25 Inboard Diesel",
+    maxHp: 25,
+    idleRpm: 850,
+    maxRpm: 3200,
+    maxThrust: 2800,        // Max forward bollard thrust (Newtons, ~630 lbf)
+    reverseThrustRatio: 0.72,// Reverse thrust factor
+    propWalkCoeff: 0.28,     // Transverse paddlewheel force ratio in reverse (stern walks to PORT)
+    propWashFactor: 2.4,     // Amplification of water velocity over rudder when motoring forward
+    rpmResponseRate: 3.2,    // Throttle response smoothness (1/s)
+  },
+
+  // Rudder
+  rudder: {
+    maxAngleDeg: 35,         // Max rudder angle (+/- 35 degrees)
+    area: 0.45,              // Rudder blade area (m^2)
+    positionY: -4.85,        // Rudder distance aft from CM (meters)
+    liftCoeff: 2.8,          // Hydrodynamic lift coefficient
+  },
+
+  // Hydrodynamic resistance coefficients (keel & hull)
+  hydrodynamics: {
+    forwardDrag: 120,        // Forward surge resistance (N / (m/s)^2)
+    reverseDrag: 150,        // Reverse surge resistance
+    lateralDrag: 1850,       // Immense sideways resistance from fin keel (N / (m/s)^2)
+    yawDamping: 45000,       // Resistance to rotational spinning (N*m / (rad/s)^2)
+    keelLiftFactor: 16000,   // Lift generated by keel when moving with leeway angle
+  },
+
+  // Boat cleat positions relative to Center of Mass (0, 0)
+  // X = Starboard (+), Port (-)
+  // Y = Bow (+), Stern (-)
+  cleats: {
+    bow_port: { id: "bow_port", name: "Bow (Port)", x: -0.85, y: 4.65 },
+    bow_starboard: { id: "bow_starboard", name: "Bow (Starboard)", x: 0.85, y: 4.65 },
+    mid_port: { id: "mid_port", name: "Midship Spring (Port)", x: -1.68, y: 0.20 },
+    mid_starboard: { id: "mid_starboard", name: "Midship Spring (Starboard)", x: 1.68, y: 0.20 },
+    stern_port: { id: "stern_port", name: "Stern (Port)", x: -1.35, y: -4.80 },
+    stern_starboard: { id: "stern_starboard", name: "Stern (Starboard)", x: 1.35, y: -4.80 },
+  },
+
+  // Fenders mounted along the port side (where the finger pier is)
+  fenders: [
+    { name: "Port Bow Fender", x: -1.45, y: 2.8, radius: 0.22 },
+    { name: "Port Mid Fender", x: -1.72, y: 0.0, radius: 0.24 },
+    { name: "Port Quarter Fender", x: -1.50, y: -3.0, radius: 0.22 },
+  ]
+};
+
+const DOCK_CONFIG = {
+  // Slip dimensions and coordinate system:
+  // Slip runs along Y axis (North/South)
+  // Head dock is at Y = 13.0 m
+  // Fairway is South at Y < 0 m
+  slipCenterlineX: 0,
+  slipWidth: 5.4, // Width between pilings (meters, ~17.7 ft)
+
+  // Head dock (main walkway at the top/North)
+  headDock: {
+    y: 13.0,
+    thickness: 2.5,
+    minX: -8.0,
+    maxX: 8.0,
+  },
+
+  // Port-side finger pier extending ~1/3 of the boat length (~3.5 m)
+  fingerPier: {
+    side: "port",
+    startX: -2.7,        // Right edge facing the slip
+    width: 1.1,          // Pier width (X goes from -3.8 to -2.7)
+    startY: 13.0,        // Attached to head dock
+    length: 3.6,         // 3.6 meters long (~11.8 ft, approx 1/3 of Beneteau 331 LOA)
+    endY: 9.4,           // Pier terminus
+    cleats: [
+      { id: "finger_end", name: "Finger Pier Outer End Cleat", x: -2.7, y: 9.55 },
+      { id: "finger_mid", name: "Finger Pier Mid Cleat", x: -2.7, y: 11.20 },
+      { id: "finger_root", name: "Finger Pier Root Cleat", x: -2.7, y: 12.80 },
+    ]
+  },
+
+  // Starboard main dock edge / neighbor slip boundary
+  starboardBoundaryX: 2.7,
+
+  // Four Pilings ("phones")
+  pilings: [
+    {
+      id: "pile_outer_port",
+      name: "Outer Port Piling",
+      x: -2.7,
+      y: 0.5,
+      radius: 0.26,
+      cleatX: -2.7,
+      cleatY: 0.5,
+    },
+    {
+      id: "pile_outer_starboard",
+      name: "Outer Starboard Piling",
+      x: 2.7,
+      y: 0.5,
+      radius: 0.26,
+      cleatX: 2.7,
+      cleatY: 0.5,
+    },
+    {
+      id: "pile_inner_port",
+      name: "Inner Port Piling / Cleat",
+      x: -2.7,
+      y: 12.8,
+      radius: 0.24,
+      cleatX: -2.7,
+      cleatY: 12.8,
+    },
+    {
+      id: "pile_inner_starboard",
+      name: "Inner Starboard Piling / Cleat",
+      x: 2.7,
+      y: 12.8,
+      radius: 0.24,
+      cleatX: 2.7,
+      cleatY: 12.8,
+    }
+  ],
+
+  // Extra head dock cleats
+  headDockCleats: [
+    { id: "head_port", name: "Head Dock Port Cleat", x: -1.2, y: 13.1 },
+    { id: "head_starboard", name: "Head Dock Starboard Cleat", x: 1.2, y: 13.1 },
+  ]
+};
+
+const MOORING_SPECS = {
+  springConstant: 55000,    // N/m (firm dock line base stiffness)
+  snubConstant: 220000,     // N/m (exponential snubbing resistance)
+  dampingConstant: 7500,    // N*s/m (internal line damping)
+  maxStretchRatio: 0.05,    // 5% max stretch before hard mechanical arrest
+  maxBreakingStrain: 38000, // N (~8,500 lbf breaking strength for 5/8" nylon line)
+};
+
+const INITIAL_CONDITIONS = {
+  approach: {
+    x: 0.0,
+    y: -4.5,              // Right outside slip mouth (outer pilings at y = 0.5), fully on-screen!
+    headingDeg: 0,        // Pointing straight North into slip
+    speedKnots: 1.0,
+    rudderDeg: 0,
+    throttle: 0.20,
+  },
+  tiedInSlip: {
+    x: -0.6,              // Snugged near the port finger pier with fenders
+    y: 7.0,               // In slip, bow near head dock, stern inside outer pilings
+    headingDeg: 0,
+    speedKnots: 0,
+    rudderDeg: 0,
+    throttle: 0.0,
+  }
+};
+
+
+// ==========================================
+// MODULE: Environment.js
+// ==========================================
+/**
+ * Environmental conditions: Wind and Current simulation.
+ */
+class Environment {
+  constructor() {
+    // Wind: direction FROM which wind blows (0 = North, 90 = East, 180 = South, 270 = West)
+    this.windSpeedKnots = 10;
+    this.windDirectionDeg = 270; // Default: West wind (crosswind from port as boat heads North)
+    this.windGustiness = 0.15;   // Gust factor (0 = steady, 0.3 = gusty)
+
+    // Current: direction TOWARDS which water is flowing (set)
+    this.currentSpeedKnots = 0.5;
+    this.currentDirectionDeg = 0; // Default: flowing North into slip
+
+    // Internal timers for gusts
+    this.time = 0;
+  }
+
+  update(dt) {
+    this.time += dt;
+  }
+
+  /**
+   * Returns current true wind velocity vector in m/s (World coordinates).
+   * Direction is where wind blows TOWARDS in world space.
+   */
+  getWindVelocityWorld() {
+    // Nautical wind: angle is FROM. So velocity points in opposite direction: angle + 180 deg
+    const fromAngleRad = (this.windDirectionDeg * Math.PI) / 180;
+    // 0 deg (North) blows South (-Y). 90 deg (East) blows West (-X).
+    // Vector pointing towards where wind goes:
+    const toAngle = fromAngleRad + Math.PI;
+
+    // Subtle gust oscillation
+    const gustNoise = Math.sin(this.time * 0.7) * 0.5 + Math.sin(this.time * 1.9 + 1.2) * 0.3;
+    const gustMultiplier = 1.0 + this.windGustiness * gustNoise;
+    const speedMs = Math.max(0, this.windSpeedKnots * KNOTS_TO_MS * gustMultiplier);
+
+    // In 2D math where +Y is North and +X is East:
+    // angle 0 is North: x = 0, y = 1.
+    // So for fromAngle: x = -sin(fromAngle), y = -cos(fromAngle)
+    return new Vector2(
+      -Math.sin(fromAngleRad) * speedMs,
+      -Math.cos(fromAngleRad) * speedMs
+    );
+  }
+
+  /**
+   * Returns water current velocity vector in m/s (World coordinates).
+   * Direction is where current is flowing TOWARDS (0 = North, 90 = East, etc.)
+   */
+  getCurrentVelocityWorld() {
+    const towardsAngleRad = (this.currentDirectionDeg * Math.PI) / 180;
+    const speedMs = this.currentSpeedKnots * KNOTS_TO_MS;
+
+    // 0 = flowing North (+Y), 90 = flowing East (+X)
+    return new Vector2(
+      Math.sin(towardsAngleRad) * speedMs,
+      Math.cos(towardsAngleRad) * speedMs
+    );
+  }
+
+  /**
+   * Calculates apparent wind vector experienced by the boat:
+   * V_apparent = V_wind_true - V_boat
+   */
+  getApparentWind(boatVelocityWorld) {
+    const trueWind = this.getWindVelocityWorld();
+    return Vector2.sub(trueWind, boatVelocityWorld);
+  }
+
+  setWind(speedKnots, directionDeg) {
+    this.windSpeedKnots = Math.max(0, speedKnots);
+    this.windDirectionDeg = (directionDeg % 360 + 360) % 360;
+  }
+
+  setCurrent(speedKnots, directionDeg) {
+    this.currentSpeedKnots = Math.max(0, speedKnots);
+    this.currentDirectionDeg = (directionDeg % 360 + 360) % 360;
+  }
+}
+
+
+// ==========================================
+// MODULE: MooringLine.js
+// ==========================================
+/**
+ * MooringLine class simulating elastic dock lines with tension,
+ * length adjustments, slack, and torque applied to boat cleats.
+ */
+class MooringLine {
+  constructor(options = {}) {
+    this.id = options.id || `line_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    this.name = options.name || "Mooring Line";
+    
+    // Boat cleat connection
+    this.boatCleatId = options.boatCleatId; // e.g. "mid_port", "bow_port", "stern_starboard"
+    
+    // Dock connection (can be piling or dock cleat)
+    this.dockId = options.dockId; // e.g. "pile_outer_port", "finger_end", etc.
+    this.dockPos = new Vector2(options.dockX || 0, options.dockY || 0);
+    this.dockName = options.dockName || "Dock Cleat";
+
+    // Physical rope parameters
+    this.restLength = options.restLength || 5.0; // Rest length in meters
+    this.k = options.k || MOORING_SPECS.springConstant; // N/m
+    this.snubK = options.snubK || MOORING_SPECS.snubConstant || 220000; // N/m (exponential snubbing)
+    this.damping = options.damping || MOORING_SPECS.dampingConstant; // N*s/m
+    this.maxStretchRatio = options.maxStretchRatio || MOORING_SPECS.maxStretchRatio || 0.05;
+    this.breakingStrain = options.breakingStrain || MOORING_SPECS.maxBreakingStrain; // N
+
+    // Live state
+    this.currentLength = this.restLength;
+    this.tension = 0; // Newtons
+    this.isTaut = false;
+    this.isBroken = false;
+    this.prevLength = this.restLength;
+
+    // Visual rendering helper
+    this.boatCleatWorldPos = new Vector2(0, 0);
+  }
+
+  /**
+   * Updates line state and calculates tension force applied to boat.
+   * @param {BoatPhysics} boat - The boat instance
+   * @param {number} dt - delta time in seconds
+   * @returns {Object|null} { worldPos: Vector2, worldForce: Vector2, tension: number } or null if broken/slack
+   */
+  computeForce(boat, dt) {
+    if (this.isBroken) return null;
+
+    // 1. Get world position of boat cleat
+    this.boatCleatWorldPos = boat.getCleatWorldPos(this.boatCleatId);
+
+    // 2. Vector from boat cleat to dock anchor
+    const lineVec = Vector2.sub(this.dockPos, this.boatCleatWorldPos);
+    this.currentLength = lineVec.length();
+
+    // 3. Elastic tension and fixed-distance arrest calculation
+    if (this.currentLength > this.restLength) {
+      this.isTaut = true;
+      const stretch = this.currentLength - this.restLength;
+      const maxAllowedStretch = Math.max(0.08, this.restLength * this.maxStretchRatio);
+
+      // Direction unit vector (pulls boat cleat TOWARDS dock anchor)
+      const dir = Vector2.divideScalar(lineVec, this.currentLength);
+
+      // Relative velocity of cleat in world space
+      const r = Vector2.sub(this.boatCleatWorldPos, boat.position);
+      const cleatVel = Vector2.add(
+        boat.velocity,
+        new Vector2(-boat.angularVelocity * r.y, boat.angularVelocity * r.x)
+      );
+
+      // Rate of elongation (positive if cleat is pulling away from dock anchor)
+      const pullAwaySpeed = -cleatVel.dot(dir);
+
+      // Progressive non-linear tension:
+      // Base stiffness + steep cubic snubbing curve as line nears physical limit
+      const stretchRatio = Math.min(2.5, stretch / maxAllowedStretch);
+      let tension = this.k * stretch + this.snubK * Math.pow(stretchRatio, 2.5) * stretch;
+      if (pullAwaySpeed > 0) {
+        tension += this.damping * pullAwaySpeed;
+      }
+      this.tension = Math.max(0, Math.min(this.breakingStrain, tension));
+
+      // Hard Distance Constraint (eliminates "infinite give"):
+      // When line reaches its physical limit, directly project boat position
+      // and arrest outward momentum so the boat cannot drift beyond the line length!
+      if (stretch > maxAllowedStretch) {
+        const overshoot = stretch - maxAllowedStretch;
+        // Project boat position towards anchor
+        boat.position.add(Vector2.multiplyScalar(dir, overshoot * 0.85));
+
+        // Kill velocity component pulling away from anchor
+        if (pullAwaySpeed > 0) {
+          boat.velocity.add(Vector2.multiplyScalar(dir, pullAwaySpeed * 0.95));
+          boat.angularVelocity *= 0.96;
+        }
+      }
+
+      const forceOnBoat = Vector2.multiplyScalar(dir, this.tension);
+      this.prevLength = this.currentLength;
+
+      return {
+        worldPos: this.boatCleatWorldPos.clone(),
+        worldForce: forceOnBoat,
+        tension: this.tension,
+      };
+    } else {
+      // Slack line
+      this.isTaut = false;
+      this.tension = 0;
+      this.prevLength = this.currentLength;
+      return null;
+    }
+  }
+
+  /**
+   * Adjust rest length (haul in or pay out line).
+   */
+  adjustLength(deltaMeters) {
+    this.restLength = Math.max(0.5, Math.min(30.0, this.restLength + deltaMeters));
+  }
+
+  setLength(meters) {
+    this.restLength = Math.max(0.5, Math.min(30.0, meters));
+  }
+}
+
+
+// ==========================================
+// MODULE: Collision.js
+// ==========================================
+/**
+ * Continuous Hull Polygon Collision System:
+ * Provides continuous perimeter collision detection between the Beneteau 331
+ * (hull polygon and fenders) and all slip structures (4 pilings, 1/3 finger pier, head dock).
+ * Enforces hard non-penetration position projection, velocity restitution, contact spring forces,
+ * and friction.
+ */
+class CollisionSystem {
+  constructor() {
+    this.dock = DOCK_CONFIG;
+
+    // Contact parameters
+    this.fenderSpring = 55000;   // N/m (fender cushion)
+    this.fenderDamping = 5500;   // N*s/m
+    this.fenderFriction = 0.35;  // Rubber fender on wood/composite
+
+    this.hullSpring = 180000;    // N/m (solid fiberglass contact)
+    this.hullDamping = 14000;    // N*s/m
+    this.hullFriction = 0.45;
+
+    this.lastContactIntensity = 0;
+
+    // Pre-build the 44-point hull perimeter polygon in local boat coordinates
+    this.hullLocalPolygon = this.buildHullPolygon();
+  }
+
+  /**
+   * Generates a 44-point dense polygon outlining the exact perimeter of the Beneteau 331.
+   * Bow is +Y, Starboard is +X.
+   */
+  buildHullPolygon() {
+    const pts = [];
+    const hl = 5.17; // half-length (meters)
+    const hb = 1.71; // half-beam (meters)
+
+    // 1. Plumb Bow Tip
+    pts.push(new Vector2(0, hl));
+
+    // 2. Starboard Bow to Midship (9 curve samples)
+    for (let i = 1; i <= 9; i++) {
+      const t = i / 10;
+      const y = hl * (1 - t);
+      const x = hb * Math.sin(t * Math.PI / 2) * (1 - 0.08 * (1 - t));
+      pts.push(new Vector2(x, y));
+    }
+    // Starboard Midship Maximum Beam
+    pts.push(new Vector2(hb, 0));
+
+    // 3. Starboard Midship to Transom (9 curve samples)
+    for (let i = 1; i <= 9; i++) {
+      const t = i / 10;
+      const y = -hl * t;
+      const x = hb - 0.38 * Math.pow(t, 1.3);
+      pts.push(new Vector2(x, y));
+    }
+    // Starboard Transom Corner
+    pts.push(new Vector2(1.33, -hl));
+
+    // 4. Transom Swim Platform Steps Curve (4 samples)
+    pts.push(new Vector2(0.66, -hl - 0.05));
+    pts.push(new Vector2(0, -hl - 0.08));
+    pts.push(new Vector2(-0.66, -hl - 0.05));
+    pts.push(new Vector2(-1.33, -hl));
+
+    // 5. Port Transom to Midship (9 curve samples)
+    for (let i = 9; i >= 1; i--) {
+      const t = i / 10;
+      const y = -hl * t;
+      const x = -(hb - 0.38 * Math.pow(t, 1.3));
+      pts.push(new Vector2(x, y));
+    }
+    // Port Midship
+    pts.push(new Vector2(-hb, 0));
+
+    // 6. Port Midship to Bow (9 curve samples)
+    for (let i = 9; i >= 1; i--) {
+      const t = i / 10;
+      const y = hl * (1 - t);
+      const x = -(hb * Math.sin(t * Math.PI / 2) * (1 - 0.08 * (1 - t)));
+      pts.push(new Vector2(x, y));
+    }
+
+    return pts;
+  }
+
+  /**
+   * Evaluates all collision contacts and returns array of external forces:
+   * [{ worldPos: Vector2, worldForce: Vector2, type: 'fender'|'hull', name: string }]
+   */
+  resolveCollisions(boat) {
+    const contactForces = [];
+    let maxIntensity = 0;
+
+    // Transform full hull polygon to world space
+    const worldPolygon = this.hullLocalPolygon.map(p => boat.localToWorld(p));
+    const numPts = worldPolygon.length;
+
+    // ========================================================
+    // A. Check Fenders against Finger Pier & Pilings
+    // ========================================================
+    for (const fender of boat.specs.fenders) {
+      const fenderWorldPos = boat.localToWorld(fender);
+      const fenderRadius = fender.radius;
+
+      // Fenders vs Pilings
+      for (const piling of this.dock.pilings) {
+        const pilingPos = new Vector2(piling.x, piling.y);
+        const dist = fenderWorldPos.distanceTo(pilingPos);
+        const minDist = fenderRadius + piling.radius;
+
+        if (dist < minDist && dist > 0.001) {
+          const penetration = minDist - dist;
+          const normal = Vector2.sub(fenderWorldPos, pilingPos).normalize();
+
+          // Hard position projection for fender cushion
+          boat.position.add(Vector2.multiplyScalar(normal, penetration * 0.75));
+
+          const r = Vector2.sub(fenderWorldPos, boat.position);
+          const pointVel = Vector2.add(
+            boat.velocity,
+            new Vector2(-boat.angularVelocity * r.y, boat.angularVelocity * r.x)
+          );
+
+          const vNormal = pointVel.dot(normal);
+          let fNormal = this.fenderSpring * penetration - this.fenderDamping * vNormal;
+          fNormal = Math.max(0, fNormal);
+
+          const tangent = new Vector2(-normal.y, normal.x);
+          const vTangent = pointVel.dot(tangent);
+          const fFriction = -Math.sign(vTangent) * Math.min(Math.abs(vTangent) * 2500, fNormal * this.fenderFriction);
+
+          contactForces.push({
+            worldPos: fenderWorldPos,
+            worldForce: Vector2.add(
+              Vector2.multiplyScalar(normal, fNormal),
+              Vector2.multiplyScalar(tangent, fFriction)
+            ),
+            type: "fender",
+            name: `${fender.name} on ${piling.name}`,
+          });
+          maxIntensity = Math.max(maxIntensity, fNormal);
+        }
+      }
+
+      // Fenders vs Port Finger Pier (X in [-3.8, -2.7], Y in [9.4, 13.0])
+      const fp = this.dock.fingerPier;
+      const clampedX = Math.max(fp.startX - fp.width, Math.min(fp.startX, fenderWorldPos.x));
+      const clampedY = Math.max(fp.endY, Math.min(fp.startY, fenderWorldPos.y));
+      const closestPoint = new Vector2(clampedX, clampedY);
+      const distPier = fenderWorldPos.distanceTo(closestPoint);
+
+      if (distPier < fenderRadius && distPier > 0.0001) {
+        const penetration = fenderRadius - distPier;
+        const normal = Vector2.sub(fenderWorldPos, closestPoint).normalize();
+
+        boat.position.add(Vector2.multiplyScalar(normal, penetration * 0.75));
+
+        const r = Vector2.sub(fenderWorldPos, boat.position);
+        const pointVel = Vector2.add(
+          boat.velocity,
+          new Vector2(-boat.angularVelocity * r.y, boat.angularVelocity * r.x)
+        );
+
+        const vNormal = pointVel.dot(normal);
+        let fNormal = this.fenderSpring * penetration - this.fenderDamping * vNormal;
+        fNormal = Math.max(0, fNormal);
+
+        const tangent = new Vector2(-normal.y, normal.x);
+        const vTangent = pointVel.dot(tangent);
+        const fFriction = -Math.sign(vTangent) * Math.min(Math.abs(vTangent) * 2500, fNormal * this.fenderFriction);
+
+        contactForces.push({
+          worldPos: fenderWorldPos,
+          worldForce: Vector2.add(
+            Vector2.multiplyScalar(normal, fNormal),
+            Vector2.multiplyScalar(tangent, fFriction)
+          ),
+          type: "fender",
+          name: `${fender.name} on Finger Pier`,
+        });
+        maxIntensity = Math.max(maxIntensity, fNormal);
+      }
+    }
+
+    // ========================================================
+    // B. Continuous Hull Polygon Collision vs Pilings
+    // ========================================================
+    for (const piling of this.dock.pilings) {
+      const pPos = new Vector2(piling.x, piling.y);
+      let minDist = Infinity;
+      let bestContactPoint = null;
+      let bestNormal = null;
+
+      // Test against all 44 line segments of the hull boundary
+      for (let i = 0; i < numPts; i++) {
+        const a = worldPolygon[i];
+        const b = worldPolygon[(i + 1) % numPts];
+
+        const ab = Vector2.sub(b, a);
+        const ap = Vector2.sub(pPos, a);
+        const abLenSq = ab.lengthSq();
+        const t = Math.max(0, Math.min(1, ap.dot(ab) / abLenSq));
+        const closest = new Vector2(a.x + t * ab.x, a.y + t * ab.y);
+        const d = pPos.distanceTo(closest);
+
+        if (d < minDist) {
+          minDist = d;
+          bestContactPoint = closest;
+        }
+      }
+
+      // Check if piling center has penetrated inside the hull polygon
+      const isInside = this.pointInPolygon(pPos, worldPolygon);
+
+      if (minDist < piling.radius || isInside) {
+        // Concrete piling collision detected!
+        const penetration = isInside ? (piling.radius + minDist) : (piling.radius - minDist);
+        
+        // Outward normal that pushes boat away from piling
+        let normal;
+        if (isInside) {
+          // Piling center is inside hull. Vector from boundary towards boat interior:
+          normal = minDist > 0.001
+            ? Vector2.sub(pPos, bestContactPoint).normalize()
+            : Vector2.sub(boat.position, pPos).normalize();
+        } else {
+          // Piling center is outside hull. Vector from piling towards boat contact point:
+          normal = minDist > 0.001
+            ? Vector2.sub(bestContactPoint, pPos).normalize()
+            : Vector2.sub(boat.position, pPos).normalize();
+        }
+
+        // 1. HARD NON-PENETRATION PROJECTION:
+        // Instantly push boat out so hull CANNOT intersect the piling!
+        const pushDist = Math.min(0.35, penetration * 0.92);
+        boat.position.add(Vector2.multiplyScalar(normal, pushDist));
+
+        // 2. Relative contact velocity
+        const r = Vector2.sub(bestContactPoint, boat.position);
+        const pointVel = Vector2.add(
+          boat.velocity,
+          new Vector2(-boat.angularVelocity * r.y, boat.angularVelocity * r.x)
+        );
+        const vNormal = pointVel.dot(normal);
+
+        // 3. Velocity rebound (restitution)
+        if (vNormal < 0) {
+          const restitution = 0.20; // fiberglass on wood piling
+          const deltaV = -(1 + restitution) * vNormal;
+          boat.velocity.add(Vector2.multiplyScalar(normal, deltaV * 0.65));
+          // Maritime torque: r_y * F_x - r_x * F_y kicks bow away from contact
+          const impulseTorque = (r.y * normal.x - r.x * normal.y) * deltaV * 2800;
+          boat.angularVelocity += impulseTorque / boat.inertia;
+        }
+
+        // 4. Stiff contact spring-damper force + friction
+        const fNormal = Math.max(0, this.hullSpring * penetration - this.hullDamping * vNormal);
+        const tangent = new Vector2(-normal.y, normal.x);
+        const vTangent = pointVel.dot(tangent);
+        const fFriction = -Math.sign(vTangent) * Math.min(Math.abs(vTangent) * 6000, fNormal * this.hullFriction);
+
+        contactForces.push({
+          worldPos: bestContactPoint,
+          worldForce: Vector2.add(
+            Vector2.multiplyScalar(normal, fNormal),
+            Vector2.multiplyScalar(tangent, fFriction)
+          ),
+          type: "hull",
+          name: `Hull on ${piling.name}`,
+        });
+
+        maxIntensity = Math.max(maxIntensity, fNormal);
+      }
+    }
+
+    // ========================================================
+    // C. Continuous Hull Collision vs Head Dock (Y = 13.0)
+    // ========================================================
+    for (const pt of worldPolygon) {
+      if (pt.y > this.dock.headDock.y) {
+        const penetration = pt.y - this.dock.headDock.y;
+        const normal = new Vector2(0, -1); // push South
+
+        // Hard position projection
+        boat.position.y -= penetration * 0.90;
+
+        const r = Vector2.sub(pt, boat.position);
+        const pointVel = Vector2.add(
+          boat.velocity,
+          new Vector2(-boat.angularVelocity * r.y, boat.angularVelocity * r.x)
+        );
+        const vNormal = pointVel.dot(normal);
+        if (vNormal < 0) {
+          boat.velocity.y = Math.min(boat.velocity.y, -Math.abs(boat.velocity.y) * 0.15);
+        }
+
+        const fNormal = Math.max(0, this.hullSpring * penetration - this.hullDamping * vNormal);
+        contactForces.push({
+          worldPos: pt.clone(),
+          worldForce: Vector2.multiplyScalar(normal, fNormal),
+          type: "hull",
+          name: "Hull on Head Dock",
+        });
+        maxIntensity = Math.max(maxIntensity, fNormal);
+      }
+    }
+
+    // ========================================================
+    // D. Continuous Hull Collision vs Port Finger Pier
+    // ========================================================
+    const fp = this.dock.fingerPier;
+    const pierLeft = fp.startX - fp.width; // -3.8
+    const pierRight = fp.startX;           // -2.7
+    const pierBottom = fp.endY;            // 9.4
+    const pierTop = fp.startY;             // 13.0
+
+    for (const pt of worldPolygon) {
+      if (pt.x > pierLeft && pt.x < pierRight && pt.y > pierBottom && pt.y < pierTop) {
+        const distRight = pierRight - pt.x;
+        const distBottom = pt.y - pierBottom;
+
+        let normal, pen;
+        if (distRight <= distBottom) {
+          normal = new Vector2(1, 0); // push East into slip
+          pen = distRight;
+          boat.position.x += pen * 0.88;
+        } else {
+          normal = new Vector2(0, -1); // push South
+          pen = distBottom;
+          boat.position.y -= pen * 0.88;
+        }
+
+        const fNormal = Math.max(0, this.hullSpring * pen);
+        contactForces.push({
+          worldPos: pt.clone(),
+          worldForce: Vector2.multiplyScalar(normal, fNormal),
+          type: "hull",
+          name: "Hull on Finger Pier",
+        });
+        maxIntensity = Math.max(maxIntensity, fNormal);
+      }
+    }
+
+    this.lastContactIntensity = maxIntensity;
+    return contactForces;
+  }
+
+  /**
+   * Ray casting algorithm to determine if a world point is inside the hull polygon.
+   */
+  pointInPolygon(point, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      const intersect = ((yi > point.y) !== (yj > point.y)) &&
+        (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+}
+
+
+// ==========================================
+// MODULE: BoatPhysics.js
+// ==========================================
+/**
+ * Realistic Physics Engine for Beneteau 331 Sailboat.
+ * Simulates rigid body mechanics, Beta 25 diesel engine, prop wash, prop walk,
+ * keel hydrodynamics, rudder lift, and aerodynamic windage.
+ */
+class BoatPhysics {
+  constructor(initialState = {}) {
+    // Rigid Body State (World Coordinates)
+    this.position = new Vector2(initialState.x || 0, initialState.y || 0);
+    this.velocity = new Vector2(0, 0); // World velocity (m/s)
+    
+    // Heading: compass angle in radians. 0 = North (+Y), PI/2 = East (+X), PI = South (-Y)
+    const initHeadingDeg = initialState.headingDeg !== undefined ? initialState.headingDeg : 0;
+    this.heading = (initHeadingDeg * Math.PI) / 180;
+    this.angularVelocity = 0; // rad/s (positive = turning clockwise / to starboard)
+
+    // Vessel Dimensions and Specs
+    this.specs = BOAT_SPECS;
+    this.mass = BOAT_SPECS.mass;
+    this.inertia = BOAT_SPECS.inertia;
+
+    // Helm & Engine Controls
+    this.rudderAngleDeg = 0; // -35 (Port) to +35 (Starboard)
+    this.throttle = 0;       // -1.0 (Full Reverse) to +1.0 (Full Forward)
+    this.currentRpm = BOAT_SPECS.engine.idleRpm;
+
+    // Telemetry & Force diagnostics for HUD visualizers
+    this.diagnostics = {
+      sogKnots: 0,
+      stwKnots: 0,
+      cogDeg: 0,
+      headingDeg: initHeadingDeg,
+      leewayDeg: 0,
+      thrustForce: 0,
+      propWalkForce: 0,
+      rudderLiftForce: 0,
+      keelLateralForce: 0,
+      windForceVector: new Vector2(0, 0),
+      currentForceVector: new Vector2(0, 0),
+      netForce: new Vector2(0, 0),
+      netTorque: 0,
+      apparentWindSpeedKnots: 0,
+      apparentWindAngleDeg: 0,
+    };
+  }
+
+  /**
+   * Direction unit vectors based on current heading.
+   * Heading 0 = North (+Y), 90 deg = East (+X).
+   */
+  getForwardVector() {
+    return new Vector2(Math.sin(this.heading), Math.cos(this.heading));
+  }
+
+  getStarboardVector() {
+    return new Vector2(Math.cos(this.heading), -Math.sin(this.heading));
+  }
+
+  getPortVector() {
+    return new Vector2(-Math.cos(this.heading), Math.sin(this.heading));
+  }
+
+  /**
+   * Converts local body coordinate (x=stbd, y=bow) to world coordinate.
+   */
+  localToWorld(localPoint) {
+    const fwd = this.getForwardVector();
+    const stbd = this.getStarboardVector();
+    return new Vector2(
+      this.position.x + stbd.x * localPoint.x + fwd.x * localPoint.y,
+      this.position.y + stbd.y * localPoint.x + fwd.y * localPoint.y
+    );
+  }
+
+  /**
+   * Converts world coordinate to local body coordinate.
+   */
+  worldToLocal(worldPoint) {
+    const rel = Vector2.sub(worldPoint, this.position);
+    const fwd = this.getForwardVector();
+    const stbd = this.getStarboardVector();
+    return new Vector2(
+      rel.dot(stbd),
+      rel.dot(fwd)
+    );
+  }
+
+  /**
+   * Returns current world position of a named cleat.
+   */
+  getCleatWorldPos(cleatId) {
+    const cleat = this.specs.cleats[cleatId];
+    if (!cleat) return this.position.clone();
+    return this.localToWorld(cleat);
+  }
+
+  /**
+   * Set rudder angle in degrees (-35 to +35).
+   * Negative = Port, Positive = Starboard.
+   */
+  setRudder(deg) {
+    this.rudderAngleDeg = Math.max(-this.specs.rudder.maxAngleDeg, 
+                          Math.min(this.specs.rudder.maxAngleDeg, deg));
+  }
+
+  /**
+   * Set throttle (-1.0 to +1.0).
+   */
+  setThrottle(val) {
+    this.throttle = Math.max(-1.0, Math.min(1.0, val));
+  }
+
+  /**
+   * Main Physics Step.
+   * @param {number} dt - delta time in seconds
+   * @param {Environment} env - Wind and current environment
+   * @param {Array} externalForces - External forces from mooring lines or collisions:
+   *        [{ worldPos: Vector2, worldForce: Vector2 }]
+   */
+  step(dt, env, externalForces = []) {
+    const fwd = this.getForwardVector();
+    const stbd = this.getStarboardVector();
+
+    // 1. Water Current & Relative Speed Through Water (STW)
+    const currentVel = env ? env.getCurrentVelocityWorld() : new Vector2(0, 0);
+    const velRelWater = Vector2.sub(this.velocity, currentVel);
+
+    // Body-frame relative velocities
+    const surgeVel = velRelWater.dot(fwd);   // Forward (+) / Reverse (-) through water
+    const swayVel = velRelWater.dot(stbd);   // Sideways drift to starboard (+) / port (-)
+
+    // 2. Beta 25 Engine RPM & Thrust
+    const engineCfg = this.specs.engine;
+    let targetRpm = engineCfg.idleRpm;
+    if (Math.abs(this.throttle) > 0.03) {
+      const throttleMag = Math.abs(this.throttle);
+      targetRpm = engineCfg.idleRpm + throttleMag * (engineCfg.maxRpm - engineCfg.idleRpm);
+    }
+    // Smooth engine ramp
+    const rpmChangeRate = (targetRpm - this.currentRpm) * engineCfg.rpmResponseRate;
+    this.currentRpm += rpmChangeRate * dt;
+
+    // Thrust calculation
+    const rpmFactor = Math.max(0, (this.currentRpm - engineCfg.idleRpm) / (engineCfg.maxRpm - engineCfg.idleRpm));
+    let thrustMagnitude = 0;
+    let propWalkMagnitude = 0;
+
+    if (this.throttle > 0.03) {
+      // Forward gear
+      thrustMagnitude = engineCfg.maxThrust * Math.pow(rpmFactor, 1.7) * (this.throttle / Math.abs(this.throttle));
+    } else if (this.throttle < -0.03) {
+      // Reverse gear: produces reverse thrust and significant prop walk
+      thrustMagnitude = -engineCfg.maxThrust * engineCfg.reverseThrustRatio * Math.pow(rpmFactor, 1.7);
+      
+      // PROP WALK: Right-hand prop discharges water sideways in reverse,
+      // pushing the stern to PORT (towards -stbd).
+      // Magnitude is proportional to reverse thrust.
+      propWalkMagnitude = Math.abs(thrustMagnitude) * engineCfg.propWalkCoeff;
+    }
+
+    // Thrust force vector in world frame (acts along boat centerline)
+    const thrustForce = Vector2.multiplyScalar(fwd, thrustMagnitude);
+
+    // Prop walk force: acts laterally on the stern (pushes stern to PORT = -stbd)
+    // Stern is at negative Y in body coordinates, so pushing stern to port causes bow to turn STARBOARD!
+    const propWalkForce = Vector2.multiplyScalar(stbd, -propWalkMagnitude);
+    const propWalkTorque = propWalkMagnitude * Math.abs(this.specs.rudder.positionY); // torque = F * arm
+
+    // 3. Rudder Dynamics & Prop Wash
+    const rudderRad = (this.rudderAngleDeg * Math.PI) / 180;
+    
+    // Prop Wash: When forward throttle is applied, high speed water is thrown directly over the rudder blade
+    let washSpeed = 0;
+    if (this.throttle > 0.03) {
+      washSpeed = Math.sqrt(Math.max(0, thrustMagnitude) / (RHO_WATER * 0.15)) * (engineCfg.propWashFactor * 0.5);
+    }
+    
+    // Effective speed of water flowing past the rudder
+    const effectiveWaterSpeed = Math.hypot(surgeVel, washSpeed);
+    
+    // Rudder lift force: pushes stern sideways when turned
+    // Turning rudder to STARBOARD (+rudderRad) pushes stern to PORT (-stbd), turning boat to STARBOARD (+torque).
+    const rudderLift = 0.5 * RHO_WATER * this.specs.rudder.area * this.specs.rudder.liftCoeff 
+                      * Math.sin(rudderRad) * Math.pow(effectiveWaterSpeed, 2);
+    
+    // Rudder lateral force on boat:
+    const rudderForceWorld = Vector2.multiplyScalar(stbd, -rudderLift);
+    const rudderTorque = rudderLift * Math.abs(this.specs.rudder.positionY); // Positive = turns bow to starboard
+
+    // 4. Keel & Hull Hydrodynamics (Lateral resistance & forward/reverse drag)
+    const hydro = this.specs.hydrodynamics;
+    
+    // Forward/reverse surge drag
+    const surgeDragCoeff = surgeVel >= 0 ? hydro.forwardDrag : hydro.reverseDrag;
+    const surgeDragMag = -Math.sign(surgeVel) * surgeDragCoeff * (surgeVel * surgeVel);
+    const surgeDragForce = Vector2.multiplyScalar(fwd, surgeDragMag);
+
+    // Lateral sway resistance (Keel): Enormous resistance preventing the sailboat from sliding sideways
+    const swayDragMag = -swayVel * hydro.lateralDrag * (Math.abs(swayVel) + 0.25);
+    const swayDragForce = Vector2.multiplyScalar(stbd, swayDragMag);
+
+    // Keel lateral lift when boat has forward speed and a small leeway angle
+    let keelLiftMag = 0;
+    if (Math.abs(surgeVel) > 0.1) {
+      const leewayAngle = Math.atan2(-swayVel, Math.abs(surgeVel));
+      keelLiftMag = Math.sin(leewayAngle) * hydro.keelLiftFactor * Math.abs(surgeVel);
+    }
+    const keelLiftForce = Vector2.multiplyScalar(stbd, keelLiftMag);
+
+    // Rotational hydrodynamic yaw damping (resists spinning in water)
+    const yawDampingTorque = -this.angularVelocity * (hydro.yawDamping * Math.abs(this.angularVelocity) + 18000);
+
+    // 5. Aerodynamic Windage (Wind pushing on topsides, cabin, and mast)
+    let windForceWorld = new Vector2(0, 0);
+    let windTorque = 0;
+    let apparentWindSpeedKnots = 0;
+    let apparentWindAngleDeg = 0;
+
+    if (env) {
+      const apparentWind = env.getApparentWind(this.velocity);
+      const appWindSpeedMs = apparentWind.length();
+      apparentWindSpeedKnots = appWindSpeedMs * MS_TO_KNOTS;
+
+      if (appWindSpeedMs > 0.05) {
+        // Apparent wind components in body frame
+        const appWindFwd = apparentWind.dot(fwd);
+        const appWindStbd = apparentWind.dot(stbd);
+
+        // Wind angle relative to boat bow
+        apparentWindAngleDeg = (Math.atan2(appWindStbd, appWindFwd) * 180 / Math.PI + 360) % 360;
+
+        // Aerodynamic drag forces
+        // Lateral wind force on topsides
+        const windSideForce = 0.5 * RHO_AIR * this.specs.windageAreaSide * 1.15 * appWindStbd * appWindSpeedMs;
+        // Longitudinal wind force
+        const windFwdForce = 0.5 * RHO_AIR * this.specs.windageAreaFront * 0.95 * appWindFwd * appWindSpeedMs;
+
+        windForceWorld = Vector2.add(
+          Vector2.multiplyScalar(stbd, windSideForce),
+          Vector2.multiplyScalar(fwd, windFwdForce)
+        );
+
+        // Wind Center of Effort (CE):
+        // Beneteau 331 bow has high freeboard; wind pushes bow downwind (bow blow-off)
+        // Center of lateral resistance is at clrOffset (-0.2m), CE is at ceOffset (+0.65m)
+        const windTorqueArm = this.specs.ceOffset - this.specs.clrOffset;
+        // Pushing starboard (+windSideForce) at forward arm (+arm) produces clockwise (+) torque (turns bow to starboard)
+        windTorque = windSideForce * windTorqueArm;
+      }
+    }
+
+    // 6. Assemble Internal Forces & Torques
+    let totalForce = new Vector2(0, 0);
+    totalForce.add(thrustForce);
+    totalForce.add(propWalkForce);
+    totalForce.add(rudderForceWorld);
+    totalForce.add(surgeDragForce);
+    totalForce.add(swayDragForce);
+    totalForce.add(keelLiftForce);
+    totalForce.add(windForceWorld);
+
+    let totalTorque = propWalkTorque + rudderTorque + yawDampingTorque + windTorque;
+
+    // 7. Add External Forces (Mooring lines & collision contacts)
+    for (const ext of externalForces) {
+      totalForce.add(ext.worldForce);
+      // Maritime clockwise torque: r_y * F_x - r_x * F_y
+      const r = Vector2.sub(ext.worldPos, this.position);
+      const extTorque = r.y * ext.worldForce.x - r.x * ext.worldForce.y;
+      totalTorque += extTorque;
+    }
+
+    // 8. Numerical Integration (Semi-Implicit Euler)
+    const accel = Vector2.divideScalar(totalForce, this.mass);
+    const angularAccel = totalTorque / this.inertia;
+
+    // Update velocities
+    this.velocity.add(Vector2.multiplyScalar(accel, dt));
+    this.angularVelocity += angularAccel * dt;
+
+    // Update positions
+    this.position.add(Vector2.multiplyScalar(this.velocity, dt));
+    this.heading += this.angularVelocity * dt;
+
+    // Keep heading in [0, 2*PI)
+    this.heading = (this.heading % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+
+    // Safeguard against NaN or infinite values
+    if (isNaN(this.position.x) || isNaN(this.position.y)) {
+      this.position.set(0, -4.5);
+      this.velocity.set(0, 0);
+    }
+    if (isNaN(this.velocity.x) || isNaN(this.velocity.y)) {
+      this.velocity.set(0, 0);
+    }
+    if (isNaN(this.heading) || isNaN(this.angularVelocity)) {
+      this.heading = 0;
+      this.angularVelocity = 0;
+    }
+
+    // 9. Update Telemetry Diagnostics
+    const sogMs = this.velocity.length();
+    this.diagnostics.sogKnots = sogMs * MS_TO_KNOTS;
+    this.diagnostics.stwKnots = velRelWater.length() * MS_TO_KNOTS;
+    this.diagnostics.headingDeg = (this.heading * 180 / Math.PI + 360) % 360;
+    this.diagnostics.cogDeg = (Math.atan2(this.velocity.x, this.velocity.y) * 180 / Math.PI + 360) % 360;
+    this.diagnostics.leewayDeg = ((this.diagnostics.headingDeg - this.diagnostics.cogDeg + 540) % 360) - 180;
+    this.diagnostics.thrustForce = thrustMagnitude;
+    this.diagnostics.propWalkForce = propWalkMagnitude;
+    this.diagnostics.rudderLiftForce = rudderLift;
+    this.diagnostics.keelLateralForce = swayDragMag + keelLiftMag;
+    this.diagnostics.windForceVector = windForceWorld;
+    this.diagnostics.netForce = totalForce;
+    this.diagnostics.netTorque = totalTorque;
+    this.diagnostics.apparentWindSpeedKnots = apparentWindSpeedKnots;
+    this.diagnostics.apparentWindAngleDeg = apparentWindAngleDeg;
+  }
+
+  /**
+   * Resets boat to specific position, heading and speed.
+   */
+  resetTo(x, y, headingDeg, speedKnots = 0) {
+    this.position.set(x, y);
+    this.heading = (headingDeg * Math.PI) / 180;
+    const fwd = this.getForwardVector();
+    this.velocity = Vector2.multiplyScalar(fwd, speedKnots * KNOTS_TO_MS);
+    this.angularVelocity = 0;
+    this.rudderAngleDeg = 0;
+    this.throttle = 0;
+    this.currentRpm = this.specs.engine.idleRpm;
+  }
+}
+
+
+// ==========================================
+// MODULE: BoatRenderer.js
+// ==========================================
+/**
+ * High-detail vector renderer for the Beneteau 331 Sailboat deck, hull, and fittings.
+ */
+class BoatRenderer {
+  constructor() {
+    this.specs = BOAT_SPECS;
+  }
+
+  /**
+   * Renders the Beneteau 331 centered at (0,0) in local coordinates (Bow is +Y, Starboard is +X)
+   * The caller context should already be translated to boat world position and rotated by heading.
+   */
+  renderBoat(ctx, boat, selectedCleatId = null, hoveredCleatId = null, isTargetMode = false) {
+    const loa = this.specs.loa;       // ~10.34m
+    const beam = this.specs.beam;     // ~3.42m
+    const halfBeam = beam / 2;        // ~1.71m
+    const halfLength = loa / 2;       // ~5.17m
+
+    ctx.save();
+
+    // 1. Water shadow under hull
+    ctx.beginPath();
+    this.drawHullPath(ctx, halfBeam + 0.15, halfLength + 0.15);
+    ctx.fillStyle = 'rgba(2, 12, 28, 0.45)';
+    ctx.fill();
+
+    // 2. Main Fiberglass Hull
+    ctx.beginPath();
+    this.drawHullPath(ctx, halfBeam, halfLength);
+    ctx.fillStyle = '#f4f6f8'; // Off-white Beneteau marine gelcoat
+    ctx.fill();
+    ctx.lineWidth = 0.08;
+    ctx.strokeStyle = '#2c3e50';
+    ctx.stroke();
+
+    // 3. Molded Non-skid Deck Outline & Teak Toe-rail
+    ctx.beginPath();
+    this.drawHullPath(ctx, halfBeam - 0.12, halfLength - 0.14);
+    ctx.lineWidth = 0.06;
+    ctx.strokeStyle = '#c49a5b'; // Teak toe-rail
+    ctx.stroke();
+
+    // Non-skid inner deck gelcoat
+    ctx.fillStyle = '#e8ecf1';
+    ctx.fill();
+
+    // 4. Beneteau Signature Coachroof & Cabin Trunk
+    this.drawCabinTrunk(ctx);
+
+    // 5. Cockpit & Twin Coamings
+    this.drawCockpit(ctx, boat);
+
+    // 6. Mast Step, Boom & Rigging Lines
+    this.drawRigging(ctx);
+
+    // 7. Rudder Blade (visible under transom/water)
+    this.drawRudder(ctx, boat.rudderAngleDeg);
+
+    // 8. Sugar Scoop / Transom Swim Platform Steps
+    this.drawSwimPlatform(ctx);
+
+    // 9. Port Fenders (hanging over port side)
+    this.drawFenders(ctx);
+
+    // 10. Cleats with Interactive Highlights
+    this.drawCleats(ctx, selectedCleatId, hoveredCleatId, isTargetMode);
+
+    // 11. Bow Heading Chevron & Vessel Nameplate
+    this.drawDeckDetails(ctx);
+
+    ctx.restore();
+  }
+
+  /**
+   * Curves for the Beneteau 331 hull:
+   * Plumb bow with fine entry, beam carried well aft, gentle taper to wide transom.
+   */
+  drawHullPath(ctx, hb, hl) {
+    // Start at bow tip (+Y)
+    ctx.moveTo(0, hl);
+    
+    // Starboard side: curve down to maximum beam around midship (y = 0), then slightly taper to wide transom
+    ctx.bezierCurveTo(hb * 0.55, hl * 0.75, hb, hl * 0.25, hb, 0.0);
+    ctx.bezierCurveTo(hb, -hl * 0.45, hb * 0.88, -hl * 0.85, hb * 0.78, -hl);
+
+    // Transom (Sugar scoop curve at stern)
+    ctx.quadraticCurveTo(0, -hl - 0.08, -hb * 0.78, -hl);
+
+    // Port side: symmetric back to bow
+    ctx.bezierCurveTo(-hb * 0.88, -hl * 0.85, -hb, -hl * 0.45, -hb, 0.0);
+    ctx.bezierCurveTo(-hb, hl * 0.25, -hb * 0.55, hl * 0.75, 0, hl);
+    ctx.closePath();
+  }
+
+  drawCabinTrunk(ctx) {
+    ctx.save();
+    // Coachroof shape
+    ctx.beginPath();
+    ctx.moveTo(0, 3.8);
+    ctx.bezierCurveTo(0.85, 3.4, 1.25, 2.0, 1.28, 0.5);
+    ctx.lineTo(1.28, -1.2);
+    ctx.lineTo(-1.28, -1.2);
+    ctx.lineTo(-1.28, 0.5);
+    ctx.bezierCurveTo(-1.25, 2.0, -0.85, 3.4, 0, 3.8);
+    ctx.closePath();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 0.04;
+    ctx.strokeStyle = '#b0bec5';
+    ctx.stroke();
+
+    // Tinted Deck Hatches (Beneteau smoked acrylic)
+    // Foredeck Hatch
+    ctx.fillStyle = 'rgba(20, 45, 75, 0.75)';
+    ctx.fillRect(-0.35, 2.6, 0.70, 0.65);
+    ctx.strokeStyle = '#78909c';
+    ctx.lineWidth = 0.02;
+    ctx.strokeRect(-0.35, 2.6, 0.70, 0.65);
+
+    // Salon Main Hatch
+    ctx.fillRect(-0.32, 1.2, 0.64, 0.55);
+    ctx.strokeRect(-0.32, 1.2, 0.64, 0.55);
+
+    // Companionway Sliding Hatch
+    ctx.fillStyle = 'rgba(15, 35, 60, 0.85)';
+    ctx.fillRect(-0.42, -1.15, 0.84, 0.7);
+    ctx.strokeRect(-0.42, -1.15, 0.84, 0.7);
+
+    ctx.restore();
+  }
+
+  drawCockpit(ctx, boat) {
+    ctx.save();
+    // Cockpit Well
+    ctx.beginPath();
+    ctx.rect(-0.95, -4.5, 1.90, 3.3);
+    ctx.fillStyle = '#e2e7ec';
+    ctx.fill();
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = '#90a4ae';
+    ctx.stroke();
+
+    // Teak Inlaid Benches
+    ctx.fillStyle = '#c89d62';
+    // Port Bench
+    ctx.fillRect(-0.92, -4.2, 0.38, 2.8);
+    // Starboard Bench
+    ctx.fillRect(0.54, -4.2, 0.38, 2.8);
+    // Helm Aft Bench
+    ctx.fillRect(-0.85, -4.45, 1.70, 0.28);
+
+    // Steering Pedestal & Wheel
+    const pedestalY = -3.8;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, pedestalY, 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = '#455a64';
+    ctx.stroke();
+
+    // Stainless Steel Steering Wheel (rotates with rudder)
+    const wheelRadius = 0.55;
+    const rudderRad = (boat.rudderAngleDeg * Math.PI) / 180;
+    // Scale wheel rotation for realistic 1.5-turn lock-to-lock feel
+    const wheelAngle = rudderRad * 3.5;
+
+    ctx.save();
+    ctx.translate(0, pedestalY);
+    ctx.rotate(wheelAngle);
+
+    // Rim
+    ctx.beginPath();
+    ctx.arc(0, 0, wheelRadius, 0, Math.PI * 2);
+    ctx.lineWidth = 0.04;
+    ctx.strokeStyle = '#263238';
+    ctx.stroke();
+
+    // Spokes
+    ctx.lineWidth = 0.02;
+    for (let i = 0; i < 6; i++) {
+      const spAng = (i * Math.PI) / 3;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(spAng) * wheelRadius, Math.sin(spAng) * wheelRadius);
+      ctx.stroke();
+    }
+    // Top-dead-center king spoke marker (leather wrap)
+    ctx.fillStyle = '#d32f2f';
+    ctx.fillRect(-0.04, wheelRadius - 0.05, 0.08, 0.07);
+
+    ctx.restore();
+    ctx.restore();
+  }
+
+  drawRigging(ctx) {
+    ctx.save();
+    // Mast collar at y = 1.95m
+    ctx.beginPath();
+    ctx.arc(0, 1.95, 0.16, 0, Math.PI * 2);
+    ctx.fillStyle = '#b0bec5';
+    ctx.fill();
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = '#37474f';
+    ctx.stroke();
+
+    // Boom outline (extending aft to cockpit)
+    ctx.beginPath();
+    ctx.moveTo(0, 1.95);
+    ctx.lineTo(0, -1.8);
+    ctx.lineWidth = 0.06;
+    ctx.strokeStyle = '#eceff1';
+    ctx.stroke();
+    ctx.lineWidth = 0.02;
+    ctx.strokeStyle = '#455a64';
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  drawRudder(ctx, rudderAngleDeg) {
+    ctx.save();
+    // Rudder is mounted under stern (y = -4.85)
+    ctx.translate(0, -4.85);
+    ctx.rotate((rudderAngleDeg * Math.PI) / 180);
+
+    // Rudder blade extending aft
+    ctx.beginPath();
+    ctx.moveTo(-0.04, 0);
+    ctx.lineTo(0.04, 0);
+    ctx.lineTo(0.03, -1.1);
+    ctx.lineTo(-0.03, -1.1);
+    ctx.closePath();
+
+    ctx.fillStyle = 'rgba(41, 128, 185, 0.7)'; // Translucent underwater blue
+    ctx.fill();
+    ctx.lineWidth = 0.02;
+    ctx.strokeStyle = '#1a5276';
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  drawSwimPlatform(ctx) {
+    ctx.save();
+    // Steps down the sugar scoop transom
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = '#c49a5b';
+    ctx.beginPath();
+    ctx.moveTo(-0.7, -4.85);
+    ctx.lineTo(0.7, -4.85);
+    ctx.moveTo(-0.6, -5.02);
+    ctx.lineTo(0.6, -5.02);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawFenders(ctx) {
+    ctx.save();
+    for (const fender of this.specs.fenders) {
+      // Draw hanging lanyard line from toerail to fender
+      ctx.beginPath();
+      ctx.moveTo(fender.x + 0.15, fender.y);
+      ctx.lineTo(fender.x, fender.y);
+      ctx.lineWidth = 0.02;
+      ctx.strokeStyle = '#333333';
+      ctx.stroke();
+
+      // Cylindrical Fender body
+      ctx.beginPath();
+      ctx.ellipse(fender.x, fender.y, fender.radius, fender.radius * 1.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#0277bd'; // Navy marine fender
+      ctx.fill();
+      ctx.lineWidth = 0.03;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      // Top/Bottom rubber eyes
+      ctx.beginPath();
+      ctx.arc(fender.x, fender.y - fender.radius * 1.4, 0.06, 0, Math.PI * 2);
+      ctx.arc(fender.x, fender.y + fender.radius * 1.4, 0.06, 0, Math.PI * 2);
+      ctx.fillStyle = '#263238';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  drawCleats(ctx, selectedCleatId, hoveredCleatId, isTargetMode = false) {
+    ctx.save();
+    const cleatEntries = Object.entries(this.specs.cleats);
+
+    for (const [id, cleat] of cleatEntries) {
+      const isSelected = selectedCleatId === id;
+      const isHovered = hoveredCleatId === id;
+
+      ctx.save();
+      ctx.translate(cleat.x, cleat.y);
+
+      // Interactive ring highlight if selected, hovered, or in target mode
+      if (isSelected || isHovered || isTargetMode) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.45, 0, Math.PI * 2);
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(0, 230, 118, 0.4)';
+          ctx.strokeStyle = '#00e676';
+        } else if (isHovered) {
+          ctx.fillStyle = 'rgba(0, 229, 255, 0.4)';
+          ctx.strokeStyle = '#00e5ff';
+        } else {
+          ctx.fillStyle = 'rgba(0, 229, 255, 0.15)';
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+        }
+        ctx.fill();
+        ctx.lineWidth = 0.04;
+        ctx.stroke();
+      }
+
+      // Horn Cleat Graphic
+      ctx.beginPath();
+      // Base plate
+      ctx.rect(-0.06, -0.16, 0.12, 0.32);
+      ctx.fillStyle = '#78909c';
+      ctx.fill();
+
+      // Cleat Horns
+      ctx.beginPath();
+      ctx.moveTo(-0.03, -0.22);
+      ctx.lineTo(0.03, -0.22);
+      ctx.lineTo(0.05, 0.22);
+      ctx.lineTo(-0.05, 0.22);
+      ctx.closePath();
+      ctx.fillStyle = '#eceff1';
+      ctx.fill();
+      ctx.lineWidth = 0.02;
+      ctx.strokeStyle = '#37474f';
+      ctx.stroke();
+
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  drawDeckDetails(ctx) {
+    ctx.save();
+    // Bow Direction Arrow (Forward indicator)
+    ctx.beginPath();
+    ctx.moveTo(0, 4.4);
+    ctx.lineTo(0.35, 3.8);
+    ctx.lineTo(0.12, 3.8);
+    ctx.lineTo(0.12, 3.4);
+    ctx.lineTo(-0.12, 3.4);
+    ctx.lineTo(-0.12, 3.8);
+    ctx.lineTo(-0.35, 3.8);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.7)';
+    ctx.fill();
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 0.02;
+    ctx.stroke();
+
+    // Vessel Identification on Transom
+    ctx.save();
+    ctx.scale(1, -1);
+    ctx.font = 'bold 0.28px sans-serif';
+    ctx.fillStyle = '#1e3a8a';
+    ctx.textAlign = 'center';
+    ctx.fillText('BENETEAU 331', 0, 5.0);
+    ctx.restore();
+
+    ctx.restore();
+  }
+}
+
+
+// ==========================================
+// MODULE: EffectsRenderer.js
+// ==========================================
+/**
+ * Renders dynamic visual effects:
+ * - Propeller wash bubbles & turbulence
+ * - Hull wake and surface foam
+ * - Wind stream particles
+ * - Current flow indicators
+ * - Force vectors & line tension indicators
+ * - Breadcrumb path trail
+ */
+class EffectsRenderer {
+  constructor() {
+    this.propWashParticles = [];
+    this.windParticles = [];
+    this.trailPoints = [];
+    this.maxTrailPoints = 250;
+    this.trailTimer = 0;
+
+    // Initialize wind particles
+    for (let i = 0; i < 60; i++) {
+      this.windParticles.push({
+        x: (Math.random() - 0.5) * 40,
+        y: (Math.random() - 0.5) * 40,
+        life: Math.random(),
+        length: 1.5 + Math.random() * 2.0,
+      });
+    }
+  }
+
+  update(dt, boat, env) {
+    // 1. Update Propeller Wash Particles
+    const propWorldPos = boat.localToWorld(new Vector2(0, -4.5));
+    const throttle = boat.throttle;
+    const rpm = boat.currentRpm;
+
+    if (Math.abs(throttle) > 0.05 && rpm > 900) {
+      const emitCount = Math.floor(Math.abs(throttle) * 4) + 1;
+      for (let i = 0; i < emitCount; i++) {
+        // Flow direction: forward throttle pushes water aft (-fwd)
+        // Reverse throttle pushes water forward (+fwd) and sideways
+        const fwd = boat.getForwardVector();
+        const stbd = boat.getStarboardVector();
+        
+        let flowDir = Vector2.multiplyScalar(fwd, throttle > 0 ? -1 : 0.8);
+        if (throttle < 0) {
+          // Prop walk discharge to starboard/port
+          flowDir.add(Vector2.multiplyScalar(stbd, (Math.random() - 0.3) * 0.8));
+        }
+
+        const speed = (rpm / 3200) * 3.5 + Math.random() * 1.5;
+        this.propWashParticles.push({
+          x: propWorldPos.x + (Math.random() - 0.5) * 0.6,
+          y: propWorldPos.y + (Math.random() - 0.5) * 0.6,
+          vx: flowDir.x * speed + (Math.random() - 0.5) * 0.5,
+          vy: flowDir.y * speed + (Math.random() - 0.5) * 0.5,
+          radius: 0.15 + Math.random() * 0.25,
+          life: 1.0,
+          decay: 0.6 + Math.random() * 0.5,
+        });
+      }
+    }
+
+    // Update existing prop wash particles
+    for (let i = this.propWashParticles.length - 1; i >= 0; i--) {
+      const p = this.propWashParticles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= 0.95;
+      p.vy *= 0.95;
+      p.radius += dt * 0.4;
+      p.life -= p.decay * dt;
+      if (p.life <= 0) {
+        this.propWashParticles.splice(i, 1);
+      }
+    }
+
+    // 2. Update Wind Stream Particles
+    if (env) {
+      const windVel = env.getWindVelocityWorld();
+      const windSpeed = windVel.length();
+      if (windSpeed > 0.1) {
+        const normWind = Vector2.divideScalar(windVel, windSpeed);
+        for (const wp of this.windParticles) {
+          wp.x += windVel.x * dt;
+          wp.y += windVel.y * dt;
+          wp.life -= dt * 0.35;
+
+          // Wrap around canvas bounds relative to boat
+          const relX = wp.x - boat.position.x;
+          const relY = wp.y - boat.position.y;
+          if (Math.abs(relX) > 22 || Math.abs(relY) > 25 || wp.life <= 0) {
+            wp.x = boat.position.x - normWind.x * 22 + (Math.random() - 0.5) * 25;
+            wp.y = boat.position.y - normWind.y * 25 + (Math.random() - 0.5) * 25;
+            wp.life = 0.8 + Math.random() * 0.4;
+          }
+        }
+      }
+    }
+
+    // 3. Update Breadcrumb Trail
+    this.trailTimer += dt;
+    if (this.trailTimer > 0.15) {
+      this.trailTimer = 0;
+      this.trailPoints.push({
+        x: boat.position.x,
+        y: boat.position.y,
+        heading: boat.heading,
+        speed: boat.velocity.length(),
+      });
+      if (this.trailPoints.length > this.maxTrailPoints) {
+        this.trailPoints.shift();
+      }
+    }
+  }
+
+  clearTrail() {
+    this.trailPoints = [];
+  }
+
+  renderTrail(ctx) {
+    if (this.trailPoints.length < 2) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(this.trailPoints[0].x, this.trailPoints[0].y);
+    for (let i = 1; i < this.trailPoints.length; i++) {
+      ctx.lineTo(this.trailPoints[i].x, this.trailPoints[i].y);
+    }
+    ctx.strokeStyle = 'rgba(52, 152, 219, 0.35)';
+    ctx.lineWidth = 0.08;
+    ctx.setLineDash([0.3, 0.3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  renderPropWash(ctx) {
+    ctx.save();
+    for (const p of this.propWashParticles) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(225, 245, 254, ${p.life * 0.6})`;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  renderWindStreamers(ctx, env) {
+    if (!env || env.windSpeedKnots < 1.0) return;
+    const windVel = env.getWindVelocityWorld();
+    const windSpeed = windVel.length();
+    const norm = Vector2.divideScalar(windVel, windSpeed);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 0.04;
+    for (const wp of this.windParticles) {
+      ctx.beginPath();
+      ctx.moveTo(wp.x, wp.y);
+      ctx.lineTo(wp.x + norm.x * wp.length, wp.y + norm.y * wp.length);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Visualizes active physics force vectors for pedagogical insight.
+   */
+  renderForceVectors(ctx, boat, mooringLines = []) {
+    ctx.save();
+    const pos = boat.position;
+    const diag = boat.diagnostics;
+
+    // Helper to draw an arrow with label
+    const drawVectorArrow = (origin, vec, scale, color, label) => {
+      const len = vec.length();
+      if (len * scale < 0.2) return;
+      const end = Vector2.add(origin, Vector2.multiplyScalar(vec, scale));
+      
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 0.08;
+      ctx.stroke();
+
+      // Arrowhead
+      const angle = Math.atan2(end.y - origin.y, end.x - origin.x);
+      const headLen = 0.35;
+      ctx.beginPath();
+      ctx.moveTo(end.x, end.y);
+      ctx.lineTo(
+        end.x - headLen * Math.cos(angle - Math.PI / 6),
+        end.y - headLen * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.lineTo(
+        end.x - headLen * Math.cos(angle + Math.PI / 6),
+        end.y - headLen * Math.sin(angle + Math.PI / 6)
+      );
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      // Text label (counter-invert Y so text is upright)
+      ctx.save();
+      ctx.translate(end.x + 0.2, end.y);
+      ctx.scale(1, -1);
+      ctx.font = 'bold 0.45px sans-serif';
+      ctx.fillStyle = color;
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    };
+
+    // 1. Course Over Ground (COG / SOG)
+    if (boat.velocity.length() > 0.05) {
+      drawVectorArrow(pos, boat.velocity, 2.5, '#00e5ff', `SOG ${diag.sogKnots.toFixed(1)}kt`);
+    }
+
+    // 2. Beta 25 Engine Thrust
+    if (Math.abs(diag.thrustForce) > 20) {
+      const fwd = boat.getForwardVector();
+      const thrustVec = Vector2.multiplyScalar(fwd, diag.thrustForce);
+      const propPos = boat.localToWorld(new Vector2(0, -4.5));
+      drawVectorArrow(propPos, thrustVec, 0.0018, '#00e676', `Thrust ${Math.round(diag.thrustForce)}N`);
+    }
+
+    // 3. Prop Walk Transverse Force (in reverse)
+    if (diag.propWalkForce > 20) {
+      const stbd = boat.getStarboardVector();
+      const walkVec = Vector2.multiplyScalar(stbd, -diag.propWalkForce);
+      const propPos = boat.localToWorld(new Vector2(0, -4.5));
+      drawVectorArrow(propPos, walkVec, 0.004, '#ff9100', `Prop Walk ${Math.round(diag.propWalkForce)}N`);
+    }
+
+    // 4. Rudder Lift Force
+    if (Math.abs(diag.rudderLiftForce) > 20) {
+      const stbd = boat.getStarboardVector();
+      const rudderLiftVec = Vector2.multiplyScalar(stbd, -diag.rudderLiftForce);
+      const rudderPos = boat.localToWorld(new Vector2(0, -4.85));
+      drawVectorArrow(rudderPos, rudderLiftVec, 0.002, '#e040fb', `Rudder ${Math.round(diag.rudderLiftForce)}N`);
+    }
+
+    // 5. Wind Force on Hull
+    if (diag.windForceVector.length() > 30) {
+      const cePos = boat.localToWorld(new Vector2(0, boat.specs.ceOffset));
+      drawVectorArrow(cePos, diag.windForceVector, 0.0015, '#40c4ff', `Wind Force ${Math.round(diag.windForceVector.length())}N`);
+    }
+
+    // 6. Mooring Line Tension Vectors at Cleats
+    for (const line of mooringLines) {
+      if (line.isTaut && line.tension > 10) {
+        const lineDir = Vector2.sub(line.dockPos, line.boatCleatWorldPos).normalize();
+        const tensionVec = Vector2.multiplyScalar(lineDir, line.tension);
+        drawVectorArrow(line.boatCleatWorldPos, tensionVec, 0.0005, '#ff5252', `${Math.round(line.tension * 0.2248)} lbf`);
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+
+// ==========================================
+// MODULE: Renderer.js
+// ==========================================
+/**
+ * Master Canvas Renderer for the Marina World, Slip, Pilings, Mooring Lines, and Vessels.
+ */
+class Renderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.boatRenderer = new BoatRenderer();
+    this.effectsRenderer = new EffectsRenderer();
+
+    // Camera settings
+    this.scale = 22; // Pixels per meter (initial zoom framing both slip and boat)
+    this.cameraPos = new Vector2(0, 3.5); // World position at center of screen
+    this.cameraMode = 'dock'; // 'dock' | 'follow' | 'free'
+
+    // Interactive cleat selection state
+    this.selectedCleat = null; // { type: 'boat'|'dock', id, name, worldPos, x, y }
+    this.selectedBoatCleatId = null;
+    this.hoveredBoatCleatId = null;
+    this.hoveredDockCleatId = null;
+    this.hoveredLineId = null;
+    this.mouseWorldPos = null;
+    this.mouseScreenPos = null;
+    this.isPaused = false;
+
+    // Display Toggles
+    this.showVectors = true;
+    this.showTrail = true;
+    this.showLabels = true;
+
+    // Handle high-DPI displays
+    this.pixelRatio = window.devicePixelRatio || 1;
+    this.resize();
+  }
+
+  resize() {
+    const width = this.canvas.clientWidth;
+    const height = this.canvas.clientHeight;
+    if (this.canvas.width !== width * this.pixelRatio || this.canvas.height !== height * this.pixelRatio) {
+      this.canvas.width = width * this.pixelRatio;
+      this.canvas.height = height * this.pixelRatio;
+    }
+  }
+
+  /**
+   * Transforms world coordinate (x: east, y: north) to screen pixel coordinate (x: right, y: down).
+   * Uses CSS pixels matching clientWidth/clientHeight.
+   * Note: in world coords, +Y is North, so screen Y is inverted (-Y).
+   */
+  worldToScreen(worldPoint) {
+    const centerX = this.canvas.clientWidth / 2;
+    const centerY = this.canvas.clientHeight / 2;
+    const screenX = centerX + (worldPoint.x - this.cameraPos.x) * this.scale;
+    const screenY = centerY - (worldPoint.y - this.cameraPos.y) * this.scale;
+    return new Vector2(screenX, screenY);
+  }
+
+  /**
+   * Transforms screen pixel coordinate (CSS pixels from getBoundingClientRect) to world coordinate.
+   */
+  screenToWorld(screenPoint) {
+    const centerX = this.canvas.clientWidth / 2;
+    const centerY = this.canvas.clientHeight / 2;
+    const worldX = this.cameraPos.x + (screenPoint.x - centerX) / this.scale;
+    const worldY = this.cameraPos.y - (screenPoint.y - centerY) / this.scale;
+    return new Vector2(worldX, worldY);
+  }
+
+  setCameraMode(mode) {
+    this.cameraMode = mode;
+  }
+
+  zoom(factor, screenPivot = null) {
+    const minScale = 12;
+    const maxScale = 90;
+    const oldScale = this.scale;
+    this.scale = Math.max(minScale, Math.min(maxScale, this.scale * factor));
+
+    if (screenPivot) {
+      // Zoom centered on cursor in CSS pixels
+      const worldBefore = this.screenToWorld(screenPivot);
+      const centerX = this.canvas.clientWidth / 2;
+      const centerY = this.canvas.clientHeight / 2;
+      this.cameraPos.x = worldBefore.x - (screenPivot.x - centerX) / this.scale;
+      this.cameraPos.y = worldBefore.y + (screenPivot.y - centerY) / this.scale;
+    }
+  }
+
+  pan(deltaPixels) {
+    this.cameraPos.x -= deltaPixels.x / this.scale;
+    this.cameraPos.y += deltaPixels.y / this.scale;
+    this.cameraMode = 'free';
+  }
+
+  centerOnBoat(boat) {
+    this.cameraPos.x = boat.position.x;
+    this.cameraPos.y = boat.position.y;
+    this.cameraMode = 'follow';
+  }
+
+  fitView(boat) {
+    // Frame both the boat and the slip (between boat Y and head dock Y=13)
+    const boatY = boat ? boat.position.y : -4.5;
+    const boatX = boat ? boat.position.x : 0;
+    this.cameraPos.x = boatX * 0.3;
+    this.cameraPos.y = Math.max(2.5, (boatY - 4.5 + 13.5) * 0.5);
+    this.scale = 22;
+    this.cameraMode = 'dock';
+  }
+
+  render(boat, env, mooringLines = []) {
+    this.resize();
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.scale(this.pixelRatio, this.pixelRatio);
+
+    const viewW = this.canvas.width / this.pixelRatio;
+    const viewH = this.canvas.height / this.pixelRatio;
+
+    // Camera NaN protection
+    if (isNaN(this.cameraPos.x) || isNaN(this.cameraPos.y)) {
+      this.cameraPos.set(0, 3.5);
+    }
+    if (isNaN(this.scale) || this.scale <= 5 || !isFinite(this.scale)) {
+      this.scale = 22;
+    }
+
+    // 1. Camera Tracking
+    if (this.cameraMode === 'follow') {
+      const targetPos = boat.position;
+      this.cameraPos.x += (targetPos.x - this.cameraPos.x) * 0.08;
+      this.cameraPos.y += (targetPos.y - this.cameraPos.y) * 0.08;
+    } else if (this.cameraMode === 'dock') {
+      // Intelligently frame both the slip and approaching boat
+      const targetX = boat.position.x * 0.25;
+      const targetY = Math.max(3.0, (boat.position.y - 4.5 + 13.5) * 0.5);
+      this.cameraPos.x += (targetX - this.cameraPos.x) * 0.08;
+      this.cameraPos.y += (targetY - this.cameraPos.y) * 0.08;
+    }
+
+    // 2. Draw Sea / Water Background
+    this.drawWater(ctx, viewW, viewH, env);
+
+    // Apply World-to-Screen Transformation Matrix
+    ctx.save();
+    const centerX = viewW / 2;
+    const centerY = viewH / 2;
+    ctx.translate(centerX, centerY);
+    ctx.scale(this.scale, -this.scale); // Invert Y so +Y is up (North)
+    ctx.translate(-this.cameraPos.x, -this.cameraPos.y);
+
+    // 3. Draw Water Grid / Nautical Depth Markings
+    this.drawWaterGrid(ctx);
+
+    // 4. Draw Breadcrumb Trail
+    if (this.showTrail) {
+      this.effectsRenderer.renderTrail(ctx);
+    }
+
+    // 5. Draw Marina Structures: Head dock, Port finger pier, Pilings
+    this.drawMarina(ctx);
+
+    // 6. Draw Mooring Lines
+    this.drawMooringLines(ctx, boat, mooringLines);
+
+    // 7. Draw Prop Wash & Wake Effects
+    this.effectsRenderer.renderPropWash(ctx);
+
+    // 8. Draw Beneteau 331 Boat
+    ctx.save();
+    ctx.translate(boat.position.x, boat.position.y);
+    ctx.rotate(-boat.heading); // Invert rotation for canvas +Y coordinate system
+    const isTargetMode = this.selectedCleat?.type === 'dock';
+    const selectedBoatId = this.selectedCleat?.type === 'boat' ? this.selectedCleat.id : this.selectedBoatCleatId;
+    this.boatRenderer.renderBoat(ctx, boat, selectedBoatId, this.hoveredBoatCleatId, isTargetMode);
+    ctx.restore();
+
+    // 9. Draw Wind Streamers
+    this.effectsRenderer.renderWindStreamers(ctx, env);
+
+    // 10. Draw Force Vectors & Diagnostics
+    if (this.showVectors) {
+      this.effectsRenderer.renderForceVectors(ctx, boat, mooringLines);
+    }
+
+    // 11. Draw interactive line-tossing guide
+    if (this.selectedCleat || this.selectedBoatCleatId) {
+      this.drawLineCreationGuide(ctx, boat);
+    }
+
+    ctx.restore(); // Restore world transform
+
+    // 12. Draw On-Screen Overlays (Scale bar, Compass Rose, Pause Banner)
+    this.drawCompassRose(ctx, env, viewW, viewH);
+    this.drawScaleBar(ctx, viewW, viewH);
+    if (this.isPaused) {
+      this.drawPauseOverlay(ctx, viewW, viewH);
+    }
+
+    ctx.restore();
+  }
+
+  drawWater(ctx, w, h, env) {
+    // Nautical deep azure water gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#0a233a');
+    grad.addColorStop(1, '#0e3454');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  drawWaterGrid(ctx) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 0.03;
+    
+    // Grid every 5 meters
+    const minX = Math.floor((this.cameraPos.x - 30) / 5) * 5;
+    const maxX = Math.ceil((this.cameraPos.x + 30) / 5) * 5;
+    const minY = Math.floor((this.cameraPos.y - 30) / 5) * 5;
+    const maxY = Math.ceil((this.cameraPos.y + 30) / 5) * 5;
+
+    ctx.beginPath();
+    for (let x = minX; x <= maxX; x += 5) {
+      ctx.moveTo(x, minY);
+      ctx.lineTo(x, maxY);
+    }
+    for (let y = minY; y <= maxY; y += 5) {
+      ctx.moveTo(minX, y);
+      ctx.lineTo(maxX, y);
+    }
+    ctx.stroke();
+
+    // Slip Fairway boundary lines (subtle channel guides)
+    ctx.strokeStyle = 'rgba(52, 152, 219, 0.18)';
+    ctx.setLineDash([0.5, 0.5]);
+    ctx.beginPath();
+    // Centerline into slip
+    ctx.moveTo(0, -25);
+    ctx.lineTo(0, 13);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+  }
+
+  drawMarina(ctx) {
+    const dock = DOCK_CONFIG;
+    ctx.save();
+
+    // A. Head Dock (North Walkway Pier: Y = 13.0 to Y = 15.5)
+    ctx.fillStyle = '#bcaaa4'; // Weathered marina dock decking
+    ctx.fillRect(dock.headDock.minX, dock.headDock.y, 
+                 dock.headDock.maxX - dock.headDock.minX, dock.headDock.thickness);
+    ctx.strokeStyle = '#5d4037';
+    ctx.lineWidth = 0.08;
+    ctx.strokeRect(dock.headDock.minX, dock.headDock.y, 
+                   dock.headDock.maxX - dock.headDock.minX, dock.headDock.thickness);
+
+    // Head dock planking lines
+    ctx.strokeStyle = '#8d6e63';
+    ctx.lineWidth = 0.03;
+    ctx.beginPath();
+    for (let x = dock.headDock.minX; x <= dock.headDock.maxX; x += 0.4) {
+      ctx.moveTo(x, dock.headDock.y);
+      ctx.lineTo(x, dock.headDock.y + dock.headDock.thickness);
+    }
+    ctx.stroke();
+
+    // B. Port-Side Finger Pier (Extends ~1/3 of boat length down to Y = 9.4)
+    const fp = dock.fingerPier;
+    const fpX = fp.startX - fp.width; // Left side of finger pier
+    ctx.fillStyle = '#a1887f';
+    ctx.fillRect(fpX, fp.endY, fp.width, fp.startY - fp.endY);
+    ctx.strokeStyle = '#4e342e';
+    ctx.lineWidth = 0.08;
+    ctx.strokeRect(fpX, fp.endY, fp.width, fp.startY - fp.endY);
+
+    // Finger pier planking
+    ctx.strokeStyle = '#6d4c41';
+    ctx.lineWidth = 0.03;
+    ctx.beginPath();
+    for (let y = fp.endY; y <= fp.startY; y += 0.35) {
+      ctx.moveTo(fpX, y);
+      ctx.lineTo(fp.startX, y);
+    }
+    ctx.stroke();
+
+    // White rubber rub-rail along finger pier slip edge (at X = -2.7)
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.09;
+    ctx.beginPath();
+    ctx.moveTo(fp.startX, fp.endY);
+    ctx.lineTo(fp.startX, fp.startY);
+    ctx.stroke();
+
+    // Pier Terminus end marker (yellow hazard bumper)
+    ctx.fillStyle = '#fbc02d';
+    ctx.fillRect(fpX, fp.endY, fp.width, 0.2);
+
+    // Finger Pier Cleats
+    for (const cleat of fp.cleats) {
+      this.drawDockCleat(ctx, cleat.x, cleat.y, cleat.id, cleat.name);
+    }
+
+    // Head dock cleats
+    for (const cleat of dock.headDockCleats) {
+      this.drawDockCleat(ctx, cleat.x, cleat.y, cleat.id, cleat.name);
+    }
+
+    // C. The Four Pilings ("phones")
+    for (const piling of dock.pilings) {
+      this.drawPiling(ctx, piling);
+    }
+
+    // D. Neighbor Slip Outline & Starboard Boundary marker
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.setLineDash([0.3, 0.3]);
+    ctx.beginPath();
+    ctx.moveTo(dock.starboardBoundaryX, 0);
+    ctx.lineTo(dock.starboardBoundaryX, 13);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+  }
+
+  drawPiling(ctx, piling) {
+    const isSelected = this.selectedCleat?.id === piling.id;
+    const isHovered = this.hoveredDockCleatId === piling.id;
+    const isTargetMode = this.selectedCleat?.type === 'boat' || (this.selectedBoatCleatId && !this.selectedCleat);
+
+    ctx.save();
+    ctx.translate(piling.x, piling.y);
+
+    // Interactive ring highlight if selected, hovered, or in target mode
+    if (isSelected || isHovered || isTargetMode) {
+      ctx.beginPath();
+      ctx.arc(0, 0, piling.radius + 0.38, 0, Math.PI * 2);
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(0, 230, 118, 0.45)';
+        ctx.strokeStyle = '#00e676';
+        ctx.lineWidth = 0.06;
+      } else if (isHovered) {
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.45)';
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 0.05;
+      } else {
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.16)';
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+        ctx.lineWidth = 0.035;
+      }
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Underwater foundation shadow
+    ctx.beginPath();
+    ctx.arc(0.06, -0.06, piling.radius + 0.05, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fill();
+
+    // Wood Timber Piling Outer Ring
+    ctx.beginPath();
+    ctx.arc(0, 0, piling.radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#3e2723';
+    ctx.fill();
+    ctx.lineWidth = 0.04;
+    ctx.strokeStyle = '#1b0000';
+    ctx.stroke();
+
+    // Piling Cap (White conical or flat fiberglass cap common on marina pilings)
+    ctx.beginPath();
+    ctx.arc(0, 0, piling.radius * 0.85, 0, Math.PI * 2);
+    ctx.fillStyle = '#eceff1';
+    ctx.fill();
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = '#78909c';
+    ctx.stroke();
+
+    // Center Mooring Eye / Ring
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.07, 0, Math.PI * 2);
+    ctx.fillStyle = '#263238';
+    ctx.fill();
+
+    // Text Label
+    if (this.showLabels) {
+      ctx.save();
+      // Counter-rotate text so it stays upright
+      ctx.scale(1, -1);
+      ctx.font = 'bold 0.38px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(piling.name, 0, piling.radius + 0.55);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  drawDockCleat(ctx, x, y, id, name) {
+    const isSelected = this.selectedCleat?.id === id;
+    const isHovered = this.hoveredDockCleatId === id;
+    const isTargetMode = this.selectedCleat?.type === 'boat' || (this.selectedBoatCleatId && !this.selectedCleat);
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    if (isSelected || isHovered || isTargetMode) {
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.42, 0, Math.PI * 2);
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(0, 230, 118, 0.45)';
+        ctx.strokeStyle = '#00e676';
+        ctx.lineWidth = 0.06;
+      } else if (isHovered) {
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.45)';
+        ctx.strokeStyle = '#00e5ff';
+        ctx.lineWidth = 0.05;
+      } else {
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.16)';
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+        ctx.lineWidth = 0.035;
+      }
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Dock Cleat Base Plate
+    ctx.fillStyle = '#37474f';
+    ctx.fillRect(-0.08, -0.15, 0.16, 0.30);
+
+    // Cleat Horns
+    ctx.fillStyle = '#cfd8dc';
+    ctx.beginPath();
+    ctx.moveTo(-0.04, -0.22);
+    ctx.lineTo(0.04, -0.22);
+    ctx.lineTo(0.04, 0.22);
+    ctx.lineTo(-0.04, 0.22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 0.02;
+    ctx.strokeStyle = '#263238';
+    ctx.stroke();
+
+    if (this.showLabels && isHovered) {
+      ctx.save();
+      ctx.scale(1, -1);
+      ctx.font = '0.35px sans-serif';
+      ctx.fillStyle = '#ffe082';
+      ctx.textAlign = 'center';
+      ctx.fillText(name, 0, -0.4);
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  drawMooringLines(ctx, boat, mooringLines) {
+    ctx.save();
+
+    for (const line of mooringLines) {
+      const p1 = boat.getCleatWorldPos(line.boatCleatId);
+      const p2 = line.dockPos;
+
+      const dist = p1.distanceTo(p2);
+      const isTaut = dist >= line.restLength;
+      const tension = line.tension;
+
+      // Determine rope color based on tension strain
+      let ropeColor = '#f5f5dc'; // Cream rope when slack
+      let lineWidth = 0.06;
+
+      if (isTaut) {
+        if (tension < 400) {
+          ropeColor = '#f1c40f'; // Gold under light load
+          lineWidth = 0.07;
+        } else if (tension < 2500) {
+          ropeColor = '#e67e22'; // Orange under working load
+          lineWidth = 0.08;
+        } else {
+          ropeColor = '#e74c3c'; // Red under heavy load / strain
+          lineWidth = 0.10;
+        }
+      }
+
+      // Cast-off highlight halo: only when line itself is hovered away from cleats
+      const isHoveredLine = this.hoveredLineId === line.id;
+
+      if (isHoveredLine) {
+        ctx.save();
+        ctx.strokeStyle = '#ff5252';
+        ctx.lineWidth = lineWidth + 0.08;
+        ctx.setLineDash([0.3, 0.2]);
+        ctx.lineDashOffset = -performance.now() * 0.005;
+        ctx.beginPath();
+        if (!isTaut) {
+          const midX = (p1.x + p2.x) / 2;
+          const midY = (p1.y + p2.y) / 2;
+          const sagAmount = Math.min(0.8, (line.restLength - dist) * 0.4);
+          const dir = Vector2.sub(p2, p1).normalize();
+          const perp = new Vector2(-dir.y, dir.x);
+          ctx.moveTo(p1.x, p1.y);
+          ctx.quadraticCurveTo(midX + perp.x * sagAmount, midY + perp.y * sagAmount, p2.x, p2.y);
+        } else {
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.strokeStyle = ropeColor;
+      ctx.lineWidth = lineWidth;
+
+      if (!isTaut) {
+        // Catenary sag curve for slack rope
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        const sagAmount = Math.min(0.8, (line.restLength - dist) * 0.4);
+        
+        // Sag perpendicular to line
+        const dir = Vector2.sub(p2, p1).normalize();
+        const perp = new Vector2(-dir.y, dir.x);
+        const ctrlX = midX + perp.x * sagAmount;
+        const ctrlY = midY + perp.y * sagAmount;
+
+        ctx.moveTo(p1.x, p1.y);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, p2.x, p2.y);
+        ctx.stroke();
+      } else {
+        // Taut straight line
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+
+        // Tension readout badge at line midpoint
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        
+        ctx.save();
+        ctx.scale(1, -1);
+        ctx.font = 'bold 0.35px sans-serif';
+        ctx.fillStyle = tension > 2500 ? '#ff5252' : '#ffeb3b';
+        ctx.textAlign = 'center';
+        const tensionLbf = Math.round(tension * 0.2248);
+        ctx.fillText(`${line.name}: ${tensionLbf} lbs`, midX, -midY - 0.25);
+        ctx.restore();
+      }
+
+      // If hovering line, show "✂ Click to Cast Off" badge
+      if (isHoveredLine) {
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        ctx.save();
+        ctx.scale(1, -1);
+        ctx.font = 'bold 0.38px sans-serif';
+        ctx.fillStyle = '#ff5252';
+        ctx.textAlign = 'center';
+        ctx.fillText(`✂ Click to Cast Off`, midX, -midY + 0.35);
+        ctx.restore();
+      }
+
+      // Attachment splices at both ends
+      ctx.fillStyle = '#2c3e50';
+      ctx.beginPath();
+      ctx.arc(p1.x, p1.y, 0.09, 0, Math.PI * 2);
+      ctx.arc(p2.x, p2.y, 0.09, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  drawLineCreationGuide(ctx, boat) {
+    if (!this.selectedCleat && !this.selectedBoatCleatId) return;
+
+    let anchorPos = null;
+    let anchorType = 'boat';
+    if (this.selectedCleat) {
+      anchorType = this.selectedCleat.type;
+      anchorPos = this.selectedCleat.type === 'boat'
+        ? boat.getCleatWorldPos(this.selectedCleat.id)
+        : this.selectedCleat.worldPos;
+    } else if (this.selectedBoatCleatId) {
+      anchorPos = boat.getCleatWorldPos(this.selectedBoatCleatId);
+      anchorType = 'boat';
+    }
+
+    if (!anchorPos) return;
+
+    ctx.save();
+
+    // 1. Pulsing guide circle on selected anchor
+    const pulse = 0.45 + Math.sin(performance.now() * 0.008) * 0.08;
+    ctx.beginPath();
+    ctx.arc(anchorPos.x, anchorPos.y, pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = '#00e676';
+    ctx.lineWidth = 0.06;
+    ctx.stroke();
+
+    // 2. Animated dashed rubber-band line to mouse cursor
+    if (this.mouseWorldPos) {
+      ctx.beginPath();
+      ctx.moveTo(anchorPos.x, anchorPos.y);
+      ctx.lineTo(this.mouseWorldPos.x, this.mouseWorldPos.y);
+      ctx.strokeStyle = '#00e676';
+      ctx.lineWidth = 0.06;
+      ctx.setLineDash([0.3, 0.2]);
+      ctx.lineDashOffset = -performance.now() * 0.005;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+  }
+
+  drawPauseOverlay(ctx, viewW, viewH) {
+    if (!this.isPaused) return;
+
+    ctx.save();
+    const bannerW = 340;
+    const bannerH = 46;
+    const x = (viewW - bannerW) / 2;
+    const y = 26;
+
+    ctx.shadowColor = 'rgba(255, 214, 0, 0.5)';
+    ctx.shadowBlur = 12;
+
+    ctx.fillStyle = 'rgba(8, 22, 38, 0.92)';
+    ctx.strokeStyle = '#ffd600';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.roundRect(x, y, bannerW, bannerH, 23);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#ffd600';
+    ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⏸ SIMULATION PAUSED', viewW / 2, y + 16);
+
+    ctx.fillStyle = '#b0bec5';
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText("Press 'P' or click Pause button to resume", viewW / 2, y + 32);
+
+    ctx.restore();
+  }
+
+  drawCompassRose(ctx, env, viewW, viewH) {
+    const x = viewW - 65;
+    const y = 65;
+    const radius = 42;
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Outer dial plate
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(10, 25, 45, 0.85)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Cardinal Points
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillStyle = '#e74c3c';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('N', 0, -radius + 10);
+    ctx.fillStyle = '#eceff1';
+    ctx.fillText('S', 0, radius - 10);
+    ctx.fillText('E', radius - 10, 0);
+    ctx.fillText('W', -radius + 10, 0);
+
+    // True Wind Direction Needle
+    if (env) {
+      // Wind comes FROM windDirectionDeg.
+      const windRad = (env.windDirectionDeg * Math.PI) / 180;
+      ctx.save();
+      ctx.rotate(windRad);
+      ctx.beginPath();
+      ctx.moveTo(0, -radius + 3);
+      ctx.lineTo(5, -radius + 18);
+      ctx.lineTo(-5, -radius + 18);
+      ctx.closePath();
+      ctx.fillStyle = '#00e5ff';
+      ctx.fill();
+      ctx.restore();
+
+      // Current Flow Direction Needle
+      const currentRad = (env.currentDirectionDeg * Math.PI) / 180;
+      ctx.save();
+      ctx.rotate(currentRad);
+      ctx.beginPath();
+      ctx.moveTo(0, radius - 4);
+      ctx.lineTo(4, radius - 16);
+      ctx.lineTo(-4, radius - 16);
+      ctx.closePath();
+      ctx.fillStyle = '#ff9100';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  drawScaleBar(ctx, viewW, viewH) {
+    const x = 20;
+    const y = viewH - 25;
+    const barLengthMeters = 5; // 5 meters
+    const barLengthPixels = barLengthMeters * this.scale;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 25, 45, 0.75)';
+    ctx.fillRect(x - 5, y - 18, barLengthPixels + 10, 24);
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + barLengthPixels, y);
+    ctx.moveTo(x, y - 4);
+    ctx.lineTo(x, y + 4);
+    ctx.moveTo(x + barLengthPixels, y - 4);
+    ctx.lineTo(x + barLengthPixels, y + 4);
+    ctx.stroke();
+
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`5 m (~16.4 ft)`, x + barLengthPixels / 2 - 32, y - 5);
+    ctx.restore();
+  }
+}
+
+
+// ==========================================
+// MODULE: HelmControls.js
+// ==========================================
+/**
+ * Helm Controls: Interactive Steering Wheel and Single-Lever Morse Throttle
+ * with keyboard support (W/S/A/D, Arrows) and Web Audio engine sounds.
+ */
+class HelmControls {
+  constructor(boat, onUpdate = () => {}) {
+    this.boat = boat;
+    this.onUpdate = onUpdate;
+
+    this.rudderTarget = 0;
+    this.throttleTarget = 0;
+    this.audioEnabled = false;
+    this.audioCtx = null;
+    this.engineOsc = null;
+    this.engineGain = null;
+
+    this.keysDown = {};
+    this.initKeyboard();
+  }
+
+  initKeyboard() {
+    window.addEventListener('keydown', (e) => {
+      // Don't trigger if user is typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+      this.keysDown[e.key.toLowerCase()] = true;
+      this.keysDown[e.code] = true;
+
+      // Quick-center wheel on Space
+      if (e.code === 'Space') {
+        this.centerWheel();
+        e.preventDefault();
+      }
+
+      // Quick Neutral on N
+      if (e.code === 'KeyN' || e.key.toLowerCase() === 'n') {
+        this.setThrottle(0);
+        e.preventDefault();
+      }
+
+      // Shift Forward by hitting W or ArrowUp
+      if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+        this.stepThrottle(1);
+        e.preventDefault();
+      }
+
+      // Shift Neutral / Reverse by hitting S or ArrowDown
+      if (e.code === 'KeyS' || e.code === 'ArrowDown' || e.key.toLowerCase() === 's') {
+        this.stepThrottle(-1);
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      this.keysDown[e.key.toLowerCase()] = false;
+      this.keysDown[e.code] = false;
+    });
+  }
+
+  stepThrottle(dir) {
+    // Marine single-lever Morse throttle detents:
+    // Full Rev (-1.0), 3/4 Rev (-0.75), Half Rev (-0.50), Slow Rev / Walk (-0.25), Neutral (0.0),
+    // Slow Ahead (+0.20), Half Ahead (+0.40), Cruising (+0.65), Full Ahead (+1.0)
+    const detents = [-1.0, -0.75, -0.50, -0.25, 0.0, 0.20, 0.40, 0.65, 1.0];
+    const current = Math.round(this.throttleTarget * 100) / 100;
+
+    let target;
+    if (dir > 0) {
+      target = detents.find(d => d > current + 0.04);
+      if (target === undefined) target = 1.0;
+    } else {
+      const reversed = [...detents].reverse();
+      target = reversed.find(d => d < current - 0.04);
+      if (target === undefined) target = -1.0;
+    }
+
+    this.setThrottle(target);
+  }
+
+  update(dt) {
+    const boat = this.boat;
+    let rudderChanged = false;
+
+    // Keyboard Steering: A / D or Left / Right
+    const steerRate = 45 * dt; // 45 degrees per second
+    if (this.keysDown['a'] || this.keysDown['arrowleft']) {
+      this.rudderTarget = Math.max(-boat.specs.rudder.maxAngleDeg, this.rudderTarget - steerRate);
+      rudderChanged = true;
+    }
+    if (this.keysDown['d'] || this.keysDown['arrowright']) {
+      this.rudderTarget = Math.min(boat.specs.rudder.maxAngleDeg, this.rudderTarget + steerRate);
+      rudderChanged = true;
+    }
+
+    // Apply to boat
+    boat.setRudder(this.rudderTarget);
+    boat.setThrottle(this.throttleTarget);
+
+    // Update audio synthesis if enabled
+    this.updateAudio(boat.currentRpm, boat.throttle);
+
+    if (rudderChanged) {
+      this.onUpdate();
+    }
+  }
+
+  setRudder(angleDeg) {
+    this.rudderTarget = Math.max(-this.boat.specs.rudder.maxAngleDeg, 
+                        Math.min(this.boat.specs.rudder.maxAngleDeg, angleDeg));
+    this.boat.setRudder(this.rudderTarget);
+    this.onUpdate();
+  }
+
+  centerWheel() {
+    this.rudderTarget = 0;
+    this.boat.setRudder(0);
+    this.onUpdate();
+  }
+
+  setThrottle(value) {
+    // Neutral detent snapping (-0.05 to +0.05 snaps to 0)
+    let val = value;
+    if (Math.abs(val) < 0.05) {
+      val = 0;
+    }
+    this.throttleTarget = Math.max(-1.0, Math.min(1.0, val));
+    this.boat.setThrottle(this.throttleTarget);
+    this.onUpdate();
+  }
+
+  toggleAudio() {
+    this.audioEnabled = !this.audioEnabled;
+    if (this.audioEnabled) {
+      this.initAudio();
+    } else if (this.audioCtx) {
+      this.audioCtx.suspend();
+    }
+    return this.audioEnabled;
+  }
+
+  initAudio() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!this.audioCtx) {
+        this.audioCtx = new AudioContext();
+        
+        // Low-frequency diesel rumble oscillator
+        this.engineOsc = this.audioCtx.createOscillator();
+        this.engineOsc.type = 'sawtooth';
+        this.engineOsc.frequency.setValueAtTime(32, this.audioCtx.currentTime);
+
+        // Low-pass filter for diesel exhaust throb
+        this.engineFilter = this.audioCtx.createBiquadFilter();
+        this.engineFilter.type = 'lowpass';
+        this.engineFilter.frequency.setValueAtTime(140, this.audioCtx.currentTime);
+
+        this.engineGain = this.audioCtx.createGain();
+        this.engineGain.gain.setValueAtTime(0.08, this.audioCtx.currentTime);
+
+        this.engineOsc.connect(this.engineFilter);
+        this.engineFilter.connect(this.engineGain);
+        this.engineGain.connect(this.audioCtx.destination);
+        this.engineOsc.start();
+      } else {
+        this.audioCtx.resume();
+      }
+    } catch (e) {
+      console.warn("Web Audio API not supported or blocked", e);
+    }
+  }
+
+  updateAudio(rpm, throttle) {
+    if (!this.audioEnabled || !this.audioCtx || !this.engineOsc) return;
+    // Map RPM 850 - 3200 to oscillator pitch 28 Hz - 75 Hz
+    const pitch = 28 + (rpm - 850) * 0.02;
+    this.engineOsc.frequency.setTargetAtTime(pitch, this.audioCtx.currentTime, 0.1);
+
+    // Gain increases under load
+    const loadVolume = 0.04 + Math.abs(throttle) * 0.07;
+    this.engineGain.gain.setTargetAtTime(loadVolume, this.audioCtx.currentTime, 0.1);
+  }
+}
+
+
+// ==========================================
+// MODULE: EnvironmentUI.js
+// ==========================================
+/**
+ * Manages Environment controls (Wind & Current speed and direction)
+ * and weather scenario presets.
+ */
+class EnvironmentUI {
+  constructor(env, onUpdate = () => {}) {
+    this.env = env;
+    this.onUpdate = onUpdate;
+
+    this.initElements();
+    this.bindEvents();
+    this.updateDisplay();
+  }
+
+  initElements() {
+    this.windSpeedInput = document.getElementById('wind-speed');
+    this.windSpeedVal = document.getElementById('wind-speed-val');
+    this.windDirInput = document.getElementById('wind-dir');
+    this.windDirVal = document.getElementById('wind-dir-val');
+    this.windCompassNeedle = document.getElementById('wind-compass-needle');
+
+    this.currentSpeedInput = document.getElementById('current-speed');
+    this.currentSpeedVal = document.getElementById('current-speed-val');
+    this.currentDirInput = document.getElementById('current-dir');
+    this.currentDirVal = document.getElementById('current-dir-val');
+    this.currentCompassNeedle = document.getElementById('current-compass-needle');
+  }
+
+  bindEvents() {
+    if (this.windSpeedInput) {
+      this.windSpeedInput.addEventListener('input', (e) => {
+        this.env.setWind(parseFloat(e.target.value), this.env.windDirectionDeg);
+        this.updateDisplay();
+        this.onUpdate();
+      });
+    }
+
+    if (this.windDirInput) {
+      this.windDirInput.addEventListener('input', (e) => {
+        this.env.setWind(this.env.windSpeedKnots, parseFloat(e.target.value));
+        this.updateDisplay();
+        this.onUpdate();
+      });
+    }
+
+    if (this.currentSpeedInput) {
+      this.currentSpeedInput.addEventListener('input', (e) => {
+        this.env.setCurrent(parseFloat(e.target.value), this.env.currentDirectionDeg);
+        this.updateDisplay();
+        this.onUpdate();
+      });
+    }
+
+    if (this.currentDirInput) {
+      this.currentDirInput.addEventListener('input', (e) => {
+        this.env.setCurrent(this.env.currentSpeedKnots, parseFloat(e.target.value));
+        this.updateDisplay();
+        this.onUpdate();
+      });
+    }
+  }
+
+  updateDisplay() {
+    if (this.windSpeedVal) this.windSpeedVal.textContent = `${this.env.windSpeedKnots.toFixed(0)} kts`;
+    if (this.windSpeedInput) this.windSpeedInput.value = this.env.windSpeedKnots;
+
+    const windCardinal = this.getCardinal(this.env.windDirectionDeg);
+    if (this.windDirVal) this.windDirVal.textContent = `${this.env.windDirectionDeg.toFixed(0)}° (${windCardinal})`;
+    if (this.windDirInput) this.windDirInput.value = this.env.windDirectionDeg;
+    if (this.windCompassNeedle) {
+      this.windCompassNeedle.style.transform = `rotate(${this.env.windDirectionDeg}deg)`;
+    }
+
+    if (this.currentSpeedVal) this.currentSpeedVal.textContent = `${this.env.currentSpeedKnots.toFixed(1)} kts`;
+    if (this.currentSpeedInput) this.currentSpeedInput.value = this.env.currentSpeedKnots;
+
+    const currentCardinal = this.getCardinal(this.env.currentDirectionDeg);
+    if (this.currentDirVal) this.currentDirVal.textContent = `${this.env.currentDirectionDeg.toFixed(0)}° (${currentCardinal})`;
+    if (this.currentDirInput) this.currentDirInput.value = this.env.currentDirectionDeg;
+    if (this.currentCompassNeedle) {
+      this.currentCompassNeedle.style.transform = `rotate(${this.env.currentDirectionDeg}deg)`;
+    }
+  }
+
+  getCardinal(deg) {
+    const val = (deg % 360 + 360) % 360;
+    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const idx = Math.round(val / 45) % 8;
+    return directions[idx];
+  }
+
+  applyPreset(presetKey) {
+    switch (presetKey) {
+      case 'calm':
+        this.env.setWind(0, 0);
+        this.env.setCurrent(0, 0);
+        break;
+      case 'port_crosswind': // Blowing FROM West (270°), pushes boat to East (off the port finger pier)
+        this.env.setWind(15, 270);
+        this.env.setCurrent(0.3, 0);
+        break;
+      case 'starboard_crosswind': // Blowing FROM East (90°), pushes boat to West (onto port finger pier)
+        this.env.setWind(15, 90);
+        this.env.setCurrent(0.2, 0);
+        break;
+      case 'headwind': // Blowing FROM North (0°), blowing straight out of the slip
+        this.env.setWind(18, 0);
+        this.env.setCurrent(0.4, 180);
+        break;
+      case 'tailwind': // Blowing FROM South (180°), blowing into the slip
+        this.env.setWind(14, 180);
+        this.env.setCurrent(0.5, 0);
+        break;
+      case 'strong_current': // Strong flood current setting across slip entrance
+        this.env.setWind(8, 270);
+        this.env.setCurrent(1.8, 90); // 1.8 kts setting to East
+        break;
+      case 'gale_test': // Heavy wind test for lines in slip
+        this.env.setWind(28, 290);
+        this.env.setCurrent(0.8, 45);
+        break;
+    }
+    this.updateDisplay();
+    this.onUpdate();
+  }
+}
+
+
+// ==========================================
+// MODULE: LineManagerUI.js
+// ==========================================
+/**
+ * Mooring Line Manager UI:
+ * Handles line attachment, line adjustments, release, and mooring presets.
+ */
+class LineManagerUI {
+  constructor(boat, linesArray, onLinesChanged = () => {}) {
+    this.boat = boat;
+    this.lines = linesArray;
+    this.onLinesChanged = onLinesChanged;
+
+    this.container = document.getElementById('active-lines-list');
+    this.statusBanner = document.getElementById('line-action-status');
+
+    this.bindGlobalButtons();
+  }
+
+  bindGlobalButtons() {
+    const clearBtn = document.getElementById('btn-clear-lines');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => this.clearAllLines());
+    }
+
+    const presetStandardBtn = document.getElementById('btn-preset-standard');
+    if (presetStandardBtn) {
+      presetStandardBtn.addEventListener('click', () => this.applyPresetStandard());
+    }
+
+    const presetSpringBtn = document.getElementById('btn-preset-spring');
+    if (presetSpringBtn) {
+      presetSpringBtn.addEventListener('click', () => this.applyPresetSpring());
+    }
+
+    const presetFullBtn = document.getElementById('btn-preset-full');
+    if (presetFullBtn) {
+      presetFullBtn.addEventListener('click', () => this.applyPresetFull());
+    }
+  }
+
+  /**
+   * Adds a new mooring line between a boat cleat and a dock piling/cleat.
+   */
+  addLine(boatCleatId, dockId, dockX, dockY, dockName) {
+    const cleatName = this.boat.specs.cleats[boatCleatId]?.name || boatCleatId;
+    const cleatPos = this.boat.getCleatWorldPos(boatCleatId);
+    const initialDist = Math.hypot(dockX - cleatPos.x, dockY - cleatPos.y);
+
+    const newLine = new MooringLine({
+      id: `line_${Date.now()}`,
+      name: `${cleatName} → ${dockName}`,
+      boatCleatId: boatCleatId,
+      dockId: dockId,
+      dockX: dockX,
+      dockY: dockY,
+      dockName: dockName,
+      restLength: Math.max(1.0, initialDist), // Snug to current distance
+    });
+
+    this.lines.push(newLine);
+    this.updateUI();
+    this.onLinesChanged();
+    return newLine;
+  }
+
+  removeLine(lineId) {
+    const idx = this.lines.findIndex(l => l.id === lineId);
+    if (idx !== -1) {
+      this.lines.splice(idx, 1);
+      this.updateUI();
+      this.onLinesChanged();
+    }
+  }
+
+  clearAllLines() {
+    this.lines.length = 0;
+    this.updateUI();
+    this.onLinesChanged();
+  }
+
+  /**
+   * Preset 1: Standard 4-Line Tie-Up
+   */
+  applyPresetStandard() {
+    this.lines.length = 0;
+    const dock = DOCK_CONFIG;
+    
+    // 1. Bow Port -> Inner Port Piling
+    this.addLine('bow_port', 'pile_inner_port', dock.pilings[2].x, dock.pilings[2].y, dock.pilings[2].name);
+    // 2. Bow Starboard -> Inner Starboard Piling
+    this.addLine('bow_starboard', 'pile_inner_starboard', dock.pilings[3].x, dock.pilings[3].y, dock.pilings[3].name);
+    // 3. Stern Port -> Outer Port Piling
+    this.addLine('stern_port', 'pile_outer_port', dock.pilings[0].x, dock.pilings[0].y, dock.pilings[0].name);
+    // 4. Stern Starboard -> Outer Starboard Piling
+    this.addLine('stern_starboard', 'pile_outer_starboard', dock.pilings[1].x, dock.pilings[1].y, dock.pilings[1].name);
+
+    this.updateUI();
+  }
+
+  /**
+   * Preset 2: Spring Line Maneuver (Port Midship Spring -> Finger Pier End Cleat)
+   */
+  applyPresetSpring() {
+    this.lines.length = 0;
+    const fpCleat = DOCK_CONFIG.fingerPier.cleats[0]; // Finger Pier Outer End Cleat
+    this.addLine('mid_port', fpCleat.id, fpCleat.x, fpCleat.y, fpCleat.name);
+    this.updateUI();
+  }
+
+  /**
+   * Preset 3: Full Moor with Springs
+   */
+  applyPresetFull() {
+    this.applyPresetStandard();
+    const fpCleats = DOCK_CONFIG.fingerPier.cleats;
+    // Add Port Midship Spring to Finger End
+    this.addLine('mid_port', fpCleats[0].id, fpCleats[0].x, fpCleats[0].y, 'Finger End (Fwd Spring)');
+    // Add Port Stern Spring to Finger Mid
+    this.addLine('stern_port', fpCleats[1].id, fpCleats[1].x, fpCleats[1].y, 'Finger Mid (Aft Spring)');
+    this.updateUI();
+  }
+
+  updateUI() {
+    if (!this.container) return;
+
+    if (this.lines.length === 0) {
+      this.container.innerHTML = `
+        <div class="empty-lines-state">
+          <p>No mooring lines secured.</p>
+          <small>Click a cleat on the boat and then a piling or dock cleat to tie a line, or choose a preset below.</small>
+        </div>
+      `;
+      return;
+    }
+
+    this.container.innerHTML = '';
+    for (const line of this.lines) {
+      const lineCard = document.createElement('div');
+      lineCard.className = `line-card ${line.isTaut ? 'taut' : 'slack'}`;
+      
+      const tensionLbs = Math.round(line.tension * 0.2248);
+      const tensionPercent = Math.min(100, Math.round((line.tension / line.breakingStrain) * 100));
+      
+      let tensionClass = 'normal';
+      if (tensionPercent > 75) tensionClass = 'critical';
+      else if (tensionPercent > 35) tensionClass = 'warning';
+
+      lineCard.innerHTML = `
+        <div class="line-header">
+          <span class="line-title">${line.name}</span>
+          <button class="btn-cast-off" data-line-id="${line.id}" title="Release / Cast off this line">Cast Off</button>
+        </div>
+        <div class="line-controls-row">
+          <div class="length-adjuster">
+            <button class="btn-step" data-action="shorten" data-line-id="${line.id}">-</button>
+            <span class="length-val">${line.restLength.toFixed(1)} m</span>
+            <button class="btn-step" data-action="lengthen" data-line-id="${line.id}">+</button>
+          </div>
+          <div class="tension-display ${tensionClass}">
+            <span class="tension-text">${line.isTaut ? `${tensionLbs} lbs` : 'Slack'}</span>
+            <div class="tension-bar-track">
+              <div class="tension-bar-fill" style="width: ${tensionPercent}%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      this.container.appendChild(lineCard);
+    }
+
+    // Bind item buttons
+    this.container.querySelectorAll('.btn-cast-off').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.removeLine(e.target.dataset.lineId);
+      });
+    });
+
+    this.container.querySelectorAll('.btn-step').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const lineId = e.target.dataset.lineId;
+        const line = this.lines.find(l => l.id === lineId);
+        if (line) {
+          const delta = e.target.dataset.action === 'shorten' ? -0.2 : 0.2;
+          line.adjustLength(delta);
+          this.updateUI();
+          this.onLinesChanged();
+        }
+      });
+    });
+  }
+
+  /**
+   * Periodic tension update for UI meters without rebuilding DOM tree
+   */
+  updateTensionMeters() {
+    if (!this.container || this.lines.length === 0) return;
+    const cards = this.container.querySelectorAll('.line-card');
+    
+    this.lines.forEach((line, idx) => {
+      const card = cards[idx];
+      if (!card) return;
+
+      const tensionLbs = Math.round(line.tension * 0.2248);
+      const tensionPercent = Math.min(100, Math.round((line.tension / line.breakingStrain) * 100));
+      
+      const tensionText = card.querySelector('.tension-text');
+      const tensionFill = card.querySelector('.tension-bar-fill');
+      const tensionDisplay = card.querySelector('.tension-display');
+
+      if (tensionText) {
+        tensionText.textContent = line.isTaut ? `${tensionLbs} lbs` : 'Slack';
+      }
+      if (tensionFill) {
+        tensionFill.style.width = `${tensionPercent}%`;
+      }
+      if (tensionDisplay) {
+        tensionDisplay.className = `tension-display ${tensionPercent > 75 ? 'critical' : (tensionPercent > 35 ? 'warning' : 'normal')}`;
+      }
+
+      if (line.isTaut) {
+        card.classList.add('taut');
+        card.classList.remove('slack');
+      } else {
+        card.classList.add('slack');
+        card.classList.remove('taut');
+      }
+    });
+  }
+}
+
+
+// ==========================================
+// MODULE: TelemetryHUD.js
+// ==========================================
+/**
+ * Telemetry HUD: Real-time Multi-Function Display (MFD) instruments,
+ * status indicators, view toggles, and nautical coaching tips.
+ */
+class TelemetryHUD {
+  constructor(boat, env, mooringLines, renderer) {
+    this.boat = boat;
+    this.env = env;
+    this.mooringLines = mooringLines;
+    this.renderer = renderer;
+
+    this.initElements();
+    this.bindEvents();
+  }
+
+  initElements() {
+    this.sogEl = document.getElementById('hud-sog');
+    this.stwEl = document.getElementById('hud-stw');
+    this.hdgEl = document.getElementById('hud-hdg');
+    this.cogEl = document.getElementById('hud-cog');
+    this.rpmEl = document.getElementById('hud-rpm');
+    this.rudderAngleEl = document.getElementById('hud-rudder-val');
+    this.rudderBarEl = document.getElementById('hud-rudder-bar');
+    this.gearEl = document.getElementById('hud-gear');
+    this.throttlePercentEl = document.getElementById('hud-throttle-percent');
+    this.coachBannerEl = document.getElementById('coach-tip-text');
+
+    this.toggleVectorsBtn = document.getElementById('toggle-vectors');
+    this.toggleTrailBtn = document.getElementById('toggle-trail');
+    this.cameraModeSelect = document.getElementById('camera-mode-select');
+  }
+
+  bindEvents() {
+    if (this.toggleVectorsBtn) {
+      this.toggleVectorsBtn.addEventListener('click', () => {
+        this.renderer.showVectors = !this.renderer.showVectors;
+        this.toggleVectorsBtn.classList.toggle('active', this.renderer.showVectors);
+      });
+    }
+
+    if (this.toggleTrailBtn) {
+      this.toggleTrailBtn.addEventListener('click', () => {
+        this.renderer.showTrail = !this.renderer.showTrail;
+        this.toggleTrailBtn.classList.toggle('active', this.renderer.showTrail);
+      });
+    }
+
+    if (this.cameraModeSelect) {
+      this.cameraModeSelect.addEventListener('change', (e) => {
+        this.renderer.setCameraMode(e.target.value);
+      });
+    }
+  }
+
+  update() {
+    const boat = this.boat;
+    const diag = boat.diagnostics;
+
+    // Numerical instruments
+    if (this.sogEl) this.sogEl.textContent = diag.sogKnots.toFixed(1);
+    if (this.stwEl) this.stwEl.textContent = diag.stwKnots.toFixed(1);
+    if (this.hdgEl) this.hdgEl.textContent = `${Math.round(diag.headingDeg).toString().padStart(3, '0')}°`;
+    if (this.cogEl) {
+      this.cogEl.textContent = diag.sogKnots > 0.08 ? `${Math.round(diag.cogDeg).toString().padStart(3, '0')}°` : '---°';
+    }
+    if (this.rpmEl) this.rpmEl.textContent = `${Math.round(boat.currentRpm)} RPM`;
+
+    // Rudder Display
+    if (this.rudderAngleEl) {
+      const angle = Math.round(boat.rudderAngleDeg);
+      const dir = angle < 0 ? 'P' : (angle > 0 ? 'S' : '');
+      this.rudderAngleEl.textContent = `${Math.abs(angle)}° ${dir}`;
+    }
+    if (this.rudderBarEl) {
+      // Percentage from center: -35 (Port) -> 0% to +35 (Starboard) -> 100%
+      const pct = 50 + (boat.rudderAngleDeg / 35) * 50;
+      this.rudderBarEl.style.width = `${Math.abs(boat.rudderAngleDeg / 35) * 50}%`;
+      this.rudderBarEl.style.left = boat.rudderAngleDeg >= 0 ? '50%' : `${pct}%`;
+      this.rudderBarEl.style.backgroundColor = boat.rudderAngleDeg < 0 ? '#ef5350' : '#66bb6a';
+    }
+
+    // Gear & Throttle Display
+    if (this.gearEl) {
+      let gear = 'NEUTRAL';
+      let gearClass = 'neutral';
+      if (boat.throttle > 0.03) {
+        gear = 'FORWARD';
+        gearClass = 'fwd';
+      } else if (boat.throttle < -0.03) {
+        gear = 'REVERSE';
+        gearClass = 'rev';
+      }
+      this.gearEl.textContent = gear;
+      this.gearEl.className = `gear-badge ${gearClass}`;
+    }
+
+    if (this.throttlePercentEl) {
+      const pct = Math.round(Math.abs(boat.throttle) * 100);
+      this.throttlePercentEl.textContent = `${pct}%`;
+    }
+
+    // Real-time Skipper Coaching Insight
+    this.updateCoachInsight();
+  }
+
+  updateCoachInsight() {
+    if (!this.coachBannerEl) return;
+    const boat = this.boat;
+    const diag = boat.diagnostics;
+    const env = this.env;
+
+    // Check spring line condition
+    const hasActiveSpring = this.mooringLines.some(l => l.isTaut && l.boatCleatId === 'mid_port');
+    if (hasActiveSpring && boat.throttle > 0.1) {
+      this.coachBannerEl.innerHTML = `<strong>Springing onto Pier:</strong> Motoring forward against the Port Midship spring line brings the stern snugly in against the short finger pier!`;
+      return;
+    }
+
+    // Check reverse prop walk
+    if (boat.throttle < -0.15 && Math.abs(boat.angularVelocity) > 0.003) {
+      this.coachBannerEl.innerHTML = `<strong>Prop Walk Active:</strong> The Beta 25 right-hand propeller transverse paddlewheel effect is walking your stern to <strong>PORT</strong>. Expect bow to swing Starboard until sternway is established!`;
+      return;
+    }
+
+    // Check forward prop wash
+    if (boat.throttle > 0.25 && diag.sogKnots < 0.6 && Math.abs(boat.rudderAngleDeg) > 10) {
+      this.coachBannerEl.innerHTML = `<strong>Prop Wash Steering:</strong> Forward propeller slipstream is flowing over the spade rudder blade, generating turn authority before the boat gains speed.`;
+      return;
+    }
+
+    // Check bow blow-off
+    if (env && env.windSpeedKnots > 8 && diag.sogKnots < 0.4 && Math.abs(diag.windForceVector.x) > 150) {
+      this.coachBannerEl.innerHTML = `<strong>Bow Blow-Off:</strong> Because the Beneteau 331 has high bow topsides and no bow thruster, crosswind will blow your bow downwind when stopped. Maintain gentle headway to preserve steerage!`;
+      return;
+    }
+
+    // Check slip entrance approach
+    if (boat.position.y > -2 && boat.position.y < 12) {
+      if (diag.sogKnots > 2.0) {
+        this.coachBannerEl.innerHTML = `<strong>Speed Caution:</strong> ${diag.sogKnots.toFixed(1)} kts is brisk inside the slip. Remember: <em>"Never approach a dock faster than you are willing to hit it."</em>`;
+        return;
+      } else {
+        this.coachBannerEl.innerHTML = `<strong>Slip Maneuver:</strong> Align along the port finger pier. Note that the finger extends only ~1/3 length; use the outer pilings and midship cleat to control your drift.`;
+        return;
+      }
+    }
+
+    // Default fairway tip
+    this.coachBannerEl.innerHTML = `<strong>Fairway Approach:</strong> Line up into the slip. Use W/S for throttle, A/D for wheel. Click cleats to tie mooring lines to pilings or finger pier.`;
+  }
+}
+
+
+// ==========================================
+// MODULE: Scenarios.js
+// ==========================================
+/**
+ * Scenarios manager for pre-configured docking drills and slip stress tests.
+ */
+class Scenarios {
+  constructor(boat, env, lineManager, renderer, telemetryHUD) {
+    this.boat = boat;
+    this.env = env;
+    this.lineManager = lineManager;
+    this.renderer = renderer;
+    this.telemetryHUD = telemetryHUD;
+
+    this.bindButtons();
+  }
+
+  bindButtons() {
+    const scenarioSelect = document.getElementById('scenario-select');
+    if (scenarioSelect) {
+      scenarioSelect.addEventListener('change', (e) => {
+        this.loadScenario(e.target.value);
+      });
+    }
+
+    const resetApproachBtn = document.getElementById('btn-reset-approach');
+    if (resetApproachBtn) {
+      resetApproachBtn.addEventListener('click', () => this.loadScenario('calm_approach'));
+    }
+
+    const resetSlipBtn = document.getElementById('btn-reset-slip');
+    if (resetSlipBtn) {
+      resetSlipBtn.addEventListener('click', () => this.loadScenario('tied_in_slip'));
+    }
+  }
+
+  loadScenario(scenarioId) {
+    this.renderer.effectsRenderer.clearTrail();
+
+    switch (scenarioId) {
+      case 'calm_approach':
+        // Approach right outside slip entrance (outer pilings at y = 0.5), heading North
+        this.boat.resetTo(0, -4.5, 0, 1.0);
+        this.boat.setThrottle(0.20);
+        this.boat.setRudder(0);
+        this.env.setWind(0, 0);
+        this.env.setCurrent(0, 0);
+        this.lineManager.clearAllLines();
+        this.renderer.setCameraMode('follow');
+        break;
+
+      case 'port_crosswind':
+        // 15 kt crosswind from port (West, 270°) pushing boat away from the short finger pier
+        this.boat.resetTo(-0.8, -4.5, 4, 1.2);
+        this.boat.setThrottle(0.25);
+        this.boat.setRudder(0);
+        this.env.setWind(15, 270);
+        this.env.setCurrent(0.3, 0);
+        this.lineManager.clearAllLines();
+        this.renderer.setCameraMode('follow');
+        break;
+
+      case 'starboard_crosswind':
+        // 15 kt crosswind from starboard (East, 90°) pushing boat onto finger pier
+        this.boat.resetTo(0.8, -4.5, -4, 1.2);
+        this.boat.setThrottle(0.22);
+        this.boat.setRudder(0);
+        this.env.setWind(15, 90);
+        this.env.setCurrent(0.3, 0);
+        this.lineManager.clearAllLines();
+        this.renderer.setCameraMode('follow');
+        break;
+
+      case 'spring_line_drill':
+        // Boat in slip alongside the 1/3 finger pier, with midship spring line attached
+        this.boat.resetTo(-0.6, 7.0, 0, 0);
+        this.boat.setThrottle(0.15); // Forward idle against spring
+        this.boat.setRudder(15); // Wheel turned away from dock to snug stern
+        this.env.setWind(10, 270);
+        this.env.setCurrent(0, 0);
+        this.lineManager.applyPresetSpring();
+        this.renderer.setCameraMode('dock');
+        break;
+
+      case 'tied_in_slip':
+        // Boat tied securely in the slip with standard lines
+        this.boat.resetTo(-0.6, 7.0, 0, 0);
+        this.boat.setThrottle(0);
+        this.boat.setRudder(0);
+        this.env.setWind(12, 270);
+        this.env.setCurrent(0.4, 0);
+        this.lineManager.applyPresetFull();
+        this.renderer.setCameraMode('dock');
+        break;
+
+      case 'backing_out':
+        // Backing out from slip into fairway - tests reverse prop walk handling
+        this.boat.resetTo(-0.6, 8.5, 0, 0);
+        this.boat.setThrottle(-0.35);
+        this.boat.setRudder(0);
+        this.env.setWind(8, 270);
+        this.env.setCurrent(0, 0);
+        this.lineManager.clearAllLines();
+        this.renderer.setCameraMode('follow');
+        break;
+    }
+
+    // Immediately snap camera to frame boat and slip
+    this.renderer.cameraPos.set(this.boat.position.x * 0.4, (this.boat.position.y + 11) * 0.5);
+
+    // Refresh UI components
+    if (this.envUI) this.envUI.updateDisplay();
+    this.telemetryHUD.update();
+    if (this.onScenarioLoaded) this.onScenarioLoaded();
+  }
+
+  setEnvUI(envUI) {
+    this.envUI = envUI;
+  }
+}
+
+
+// ==========================================
+// MODULE: main.js
+// ==========================================
+class App {
+  constructor() {
+    this.canvas = document.getElementById('sim-canvas');
+    
+    // Core simulation state
+    this.boat = new BoatPhysics(INITIAL_CONDITIONS.approach);
+    this.boat.setThrottle(INITIAL_CONDITIONS.approach.throttle);
+    this.env = new Environment();
+    this.collision = new CollisionSystem();
+    this.mooringLines = [];
+    this.selectedCleat = null; // { type: 'boat'|'dock', id, name, worldPos, x, y }
+
+    // Simulation timing & speed
+    this.simSpeed = 1.0; // 0 = paused, 0.5 = slow-mo, 1.0 = normal, 2.0 = fast
+    this.isPaused = false;
+    this.lastTime = performance.now();
+
+    // Render & UI components
+    this.renderer = new Renderer(this.canvas);
+    this.helm = new HelmControls(this.boat, () => this.onHelmInput());
+    this.envUI = new EnvironmentUI(this.env, () => {});
+    this.lineManager = new LineManagerUI(this.boat, this.mooringLines, () => {});
+    this.telemetryHUD = new TelemetryHUD(this.boat, this.env, this.mooringLines, this.renderer);
+    this.scenarios = new Scenarios(this.boat, this.env, this.lineManager, this.renderer, this.telemetryHUD);
+    this.scenarios.setEnvUI(this.envUI);
+    this.scenarios.onScenarioLoaded = () => {
+      this.onHelmInput();
+    };
+
+    this.bindCanvasEvents();
+    this.bindControlPanels();
+    this.bindWheelWidget();
+    this.bindGlobalKeyboard();
+
+    // Initial camera framing: guarantees boat and slip are centered and visible on startup
+    this.renderer.fitView(this.boat);
+
+    // Initial UI synchronization
+    this.onHelmInput();
+    this.updatePauseUI();
+
+    // Start simulation loop
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  onHelmInput() {
+    // 1. Update Rudder Slider & Text
+    const rudderSlider = document.getElementById('rudder-slider');
+    if (rudderSlider) rudderSlider.value = this.boat.rudderAngleDeg;
+
+    const rudderAngleVal = document.getElementById('rudder-angle-val');
+    if (rudderAngleVal) {
+      const deg = Math.round(this.boat.rudderAngleDeg);
+      if (deg === 0) {
+        rudderAngleVal.textContent = '0° (Center)';
+        rudderAngleVal.style.color = '#ffffff';
+      } else if (deg < 0) {
+        rudderAngleVal.textContent = `${Math.abs(deg)}° Port`;
+        rudderAngleVal.style.color = '#ef5350';
+      } else {
+        rudderAngleVal.textContent = `${deg}° Starboard`;
+        rudderAngleVal.style.color = '#66bb6a';
+      }
+    }
+
+    // 2. Rotate SVG Helm Wheel Graphic
+    const wheelGraphic = document.getElementById('helm-wheel-graphic');
+    if (wheelGraphic) {
+      const wheelAngle = this.boat.rudderAngleDeg * 3.5;
+      wheelGraphic.style.transform = `rotate(${wheelAngle}deg)`;
+    }
+
+    // 3. Update Throttle Slider & Text
+    const throttleSlider = document.getElementById('throttle-slider');
+    if (throttleSlider) throttleSlider.value = this.boat.throttle;
+
+    const throttleDisplayVal = document.getElementById('throttle-display-val');
+    if (throttleDisplayVal) {
+      const pct = Math.round(Math.abs(this.boat.throttle) * 100);
+      if (Math.abs(this.boat.throttle) < 0.03) {
+        throttleDisplayVal.textContent = 'NEUTRAL (0%)';
+        throttleDisplayVal.style.color = '#ffd600';
+      } else if (this.boat.throttle > 0) {
+        throttleDisplayVal.textContent = `FORWARD (${pct}%)`;
+        throttleDisplayVal.style.color = '#00e676';
+      } else {
+        throttleDisplayVal.textContent = `REVERSE (${pct}%)`;
+        throttleDisplayVal.style.color = '#ff5252';
+      }
+    }
+  }
+
+  bindWheelWidget() {
+    const wheel = document.getElementById('helm-wheel-graphic');
+    if (!wheel) return;
+
+    let isDragging = false;
+    let lastClientX = 0;
+    let lastClientY = 0;
+    let dragDistTotal = 0;
+
+    // Use Pointer Events for unified mouse, touch, and trackpad drag
+    wheel.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+      dragDistTotal = 0;
+      wheel.style.cursor = 'grabbing';
+      try {
+        wheel.setPointerCapture(e.pointerId);
+      } catch (_) {}
+      e.preventDefault();
+    });
+
+    wheel.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+
+      const dx = e.clientX - lastClientX;
+      const dy = e.clientY - lastClientY;
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+      dragDistTotal += Math.hypot(dx, dy);
+
+      // Wheel geometry
+      const rect = wheel.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const rx = e.clientX - cx;
+      const ry = e.clientY - cy;
+      const r = Math.hypot(rx, ry);
+
+      // Compute tangential displacement around wheel center (clockwise = positive)
+      let tangentDelta = 0;
+      if (r > 12) {
+        // Tangent unit vector pointing clockwise: (-ry/r, rx/r)
+        tangentDelta = (-dx * ry + dy * rx) / r;
+      }
+
+      // Blend tangential circular drag with horizontal scrub
+      // Dragging right turns starboard, dragging left turns port, and circular drag works everywhere!
+      const effectiveDelta = 0.65 * tangentDelta + 0.35 * dx;
+
+      // Sensitivity: ~0.45 degrees of rudder per pixel of movement
+      const deltaRudderDeg = effectiveDelta * 0.45;
+      const newRudder = this.boat.rudderAngleDeg + deltaRudderDeg;
+
+      this.helm.setRudder(newRudder);
+      this.onHelmInput();
+    });
+
+    const endDrag = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      wheel.style.cursor = 'ew-resize';
+      try {
+        wheel.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+
+      // If user clicked without dragging (distance < 5px):
+      if (dragDistTotal < 5) {
+        const rect = wheel.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const rx = e.clientX - cx;
+        const ry = e.clientY - cy;
+
+        if (Math.hypot(rx, ry) < 16) {
+          // Center hub clicked -> center rudder
+          this.helm.centerWheel();
+        } else if (rx > 0) {
+          // Clicked right side of wheel -> nudge starboard +5°
+          this.helm.setRudder(this.boat.rudderAngleDeg + 5);
+        } else {
+          // Clicked left side of wheel -> nudge port -5°
+          this.helm.setRudder(this.boat.rudderAngleDeg - 5);
+        }
+        this.onHelmInput();
+      }
+    };
+
+    wheel.addEventListener('pointerup', endDrag);
+    wheel.addEventListener('pointercancel', endDrag);
+
+    // Double-click wheel: instant center
+    wheel.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      this.helm.centerWheel();
+      this.onHelmInput();
+    });
+
+    // Mouse wheel scroll on the steering wheel: quick adjustment
+    wheel.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const step = e.deltaY < 0 ? 3 : -3;
+      this.helm.setRudder(this.boat.rudderAngleDeg + step);
+      this.onHelmInput();
+    }, { passive: false });
+  }
+
+  bindControlPanels() {
+    // Wheel / Rudder Slider
+    const rudderSlider = document.getElementById('rudder-slider');
+    if (rudderSlider) {
+      rudderSlider.addEventListener('input', (e) => {
+        this.helm.setRudder(parseFloat(e.target.value));
+        this.onHelmInput();
+      });
+    }
+
+    // All Rudder Quick Buttons (Center, Port 15, Stbd 15, Hard Port/Stbd)
+    document.querySelectorAll('.btn-rudder-quick').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseFloat(btn.dataset.rudder);
+        if (val === 0) {
+          this.helm.centerWheel();
+        } else {
+          this.helm.setRudder(val);
+        }
+        this.onHelmInput();
+      });
+    });
+
+    // Morse Throttle Slider
+    const throttleSlider = document.getElementById('throttle-slider');
+    if (throttleSlider) {
+      throttleSlider.addEventListener('input', (e) => {
+        this.helm.setThrottle(parseFloat(e.target.value));
+        this.onHelmInput();
+      });
+    }
+
+    // All Throttle Quick Buttons (Neutral, Slow, Rev, Full)
+    document.querySelectorAll('.btn-throttle-quick').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = parseFloat(btn.dataset.throttle);
+        this.helm.setThrottle(val);
+        this.onHelmInput();
+      });
+    });
+
+    // Camera Mode Dropdown Select
+    const cameraSelect = document.getElementById('camera-mode-select');
+    if (cameraSelect) {
+      cameraSelect.value = this.renderer.cameraMode;
+      cameraSelect.addEventListener('change', (e) => {
+        this.renderer.setCameraMode(e.target.value);
+      });
+    }
+
+    // Camera Navigation Buttons: Locate Boat & Fit View
+    const locateBoatBtn = document.getElementById('btn-locate-boat');
+    if (locateBoatBtn) {
+      locateBoatBtn.addEventListener('click', () => {
+        this.renderer.centerOnBoat(this.boat);
+        if (cameraSelect) cameraSelect.value = 'follow';
+      });
+    }
+
+    const fitViewBtn = document.getElementById('btn-fit-view');
+    if (fitViewBtn) {
+      fitViewBtn.addEventListener('click', () => {
+        this.renderer.fitView(this.boat);
+        if (cameraSelect) cameraSelect.value = 'dock';
+      });
+    }
+
+    // Canvas Quick Navigation Toolbar Buttons
+    const quickBoat = document.getElementById('btn-quick-boat');
+    if (quickBoat) {
+      quickBoat.addEventListener('click', () => {
+        this.renderer.centerOnBoat(this.boat);
+        if (cameraSelect) cameraSelect.value = 'follow';
+      });
+    }
+
+    const quickDock = document.getElementById('btn-quick-dock');
+    if (quickDock) {
+      quickDock.addEventListener('click', () => {
+        this.renderer.setCameraMode('dock');
+        if (cameraSelect) cameraSelect.value = 'dock';
+      });
+    }
+
+    const quickFit = document.getElementById('btn-quick-fit');
+    if (quickFit) {
+      quickFit.addEventListener('click', () => {
+        this.renderer.fitView(this.boat);
+        if (cameraSelect) cameraSelect.value = 'dock';
+      });
+    }
+
+    const quickReset = document.getElementById('btn-quick-reset');
+    if (quickReset) {
+      quickReset.addEventListener('click', () => {
+        this.scenarios.loadScenario('calm_approach');
+        this.onHelmInput();
+        if (cameraSelect) cameraSelect.value = 'dock';
+      });
+    }
+
+    // Toggle Vectors & Trail Buttons
+    const toggleVectorsBtn = document.getElementById('toggle-vectors');
+    if (toggleVectorsBtn) {
+      toggleVectorsBtn.addEventListener('click', () => {
+        this.renderer.showVectors = !this.renderer.showVectors;
+        toggleVectorsBtn.textContent = `Force Vectors: ${this.renderer.showVectors ? 'ON' : 'OFF'}`;
+        toggleVectorsBtn.classList.toggle('active', this.renderer.showVectors);
+      });
+    }
+
+    const toggleTrailBtn = document.getElementById('toggle-trail');
+    if (toggleTrailBtn) {
+      toggleTrailBtn.addEventListener('click', () => {
+        this.renderer.showTrail = !this.renderer.showTrail;
+        toggleTrailBtn.textContent = `Path Trail: ${this.renderer.showTrail ? 'ON' : 'OFF'}`;
+        toggleTrailBtn.classList.toggle('active', this.renderer.showTrail);
+      });
+    }
+
+    // Weather Preset Buttons
+    document.querySelectorAll('.btn-weather-preset').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const preset = e.currentTarget.dataset.preset;
+        this.envUI.applyPreset(preset);
+      });
+    });
+
+    // Sim Speed Controls
+    const pauseBtn = document.getElementById('btn-sim-pause');
+    if (pauseBtn) {
+      pauseBtn.addEventListener('click', () => this.togglePause());
+    }
+
+    const quickPause = document.getElementById('btn-quick-pause');
+    if (quickPause) {
+      quickPause.addEventListener('click', () => this.togglePause());
+    }
+
+    document.querySelectorAll('.btn-sim-speed').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.btn-sim-speed').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        this.simSpeed = parseFloat(e.currentTarget.dataset.speed);
+      });
+    });
+
+    // Sound toggle
+    const soundBtn = document.getElementById('btn-toggle-sound');
+    if (soundBtn) {
+      soundBtn.addEventListener('click', () => {
+        const enabled = this.helm.toggleAudio();
+        soundBtn.textContent = enabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+        soundBtn.classList.toggle('active', enabled);
+      });
+    }
+
+    // Help / Quick Tutorial modal toggle
+    const helpBtn = document.getElementById('btn-help');
+    const helpModal = document.getElementById('help-modal');
+    const closeHelpBtn = document.getElementById('btn-close-help');
+    if (helpBtn && helpModal) {
+      helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+    }
+    if (closeHelpBtn && helpModal) {
+      closeHelpBtn.addEventListener('click', () => helpModal.classList.add('hidden'));
+    }
+  }
+
+  bindGlobalKeyboard() {
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.code === 'KeyP' || e.key.toLowerCase() === 'p') {
+        this.togglePause();
+        e.preventDefault();
+      }
+    });
+  }
+
+  togglePause() {
+    this.isPaused = !this.isPaused;
+    this.renderer.isPaused = this.isPaused;
+    this.updatePauseUI();
+  }
+
+  updatePauseUI() {
+    const pauseBtn = document.getElementById('btn-sim-pause');
+    if (pauseBtn) {
+      pauseBtn.innerHTML = this.isPaused ? '▶ Resume <span class="key-badge">P</span>' : '⏸ Pause <span class="key-badge">P</span>';
+      pauseBtn.classList.toggle('active', this.isPaused);
+      pauseBtn.classList.toggle('paused', this.isPaused);
+    }
+    const quickPause = document.getElementById('btn-quick-pause');
+    if (quickPause) {
+      quickPause.innerHTML = this.isPaused ? '▶ Resume' : '⏸ Pause';
+      quickPause.classList.toggle('paused', this.isPaused);
+    }
+  }
+
+  getAllBoatCleats() {
+    const list = [];
+    for (const [id, cleat] of Object.entries(this.boat.specs.cleats)) {
+      list.push({
+        type: 'boat',
+        id: id,
+        name: cleat.name,
+        worldPos: this.boat.getCleatWorldPos(id),
+        radius: 0.4
+      });
+    }
+    return list;
+  }
+
+  getAllDockTargets() {
+    const list = [];
+    for (const piling of DOCK_CONFIG.pilings) {
+      list.push({
+        type: 'dock',
+        id: piling.id,
+        name: piling.name,
+        x: piling.x,
+        y: piling.y,
+        radius: piling.radius + 0.35,
+        worldPos: new Vector2(piling.x, piling.y)
+      });
+    }
+    for (const cleat of DOCK_CONFIG.fingerPier.cleats) {
+      list.push({
+        type: 'dock',
+        id: cleat.id,
+        name: cleat.name,
+        x: cleat.x,
+        y: cleat.y,
+        radius: 0.45,
+        worldPos: new Vector2(cleat.x, cleat.y)
+      });
+    }
+    for (const cleat of DOCK_CONFIG.headDockCleats) {
+      list.push({
+        type: 'dock',
+        id: cleat.id,
+        name: cleat.name,
+        x: cleat.x,
+        y: cleat.y,
+        radius: 0.45,
+        worldPos: new Vector2(cleat.x, cleat.y)
+      });
+    }
+    return list;
+  }
+
+  findCleatAtScreen(screenPos, worldPos) {
+    const candidates = [...this.getAllBoatCleats(), ...this.getAllDockTargets()];
+    let best = null;
+    let bestDist = Infinity;
+
+    for (const c of candidates) {
+      const screenPt = this.renderer.worldToScreen(c.worldPos);
+      const screenDist = screenPos.distanceTo(screenPt);
+
+      // Hit threshold: comfortable 15 screen pixels (covers cleat + visual highlight ring)
+      const maxScreenDist = 15; // pixels
+
+      if (screenDist < maxScreenDist) {
+        if (screenDist < bestDist) {
+          bestDist = screenDist;
+          best = c;
+        }
+      }
+    }
+    return best;
+  }
+
+  bindCanvasEvents() {
+    let isMouseDown = false;
+    let isDragging = false;
+    let dragStart = new Vector2(0, 0);
+    let mouseDownPos = new Vector2(0, 0);
+
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) { // Left click
+        isMouseDown = true;
+        isDragging = false;
+        dragStart.set(e.clientX, e.clientY);
+        mouseDownPos.set(e.clientX, e.clientY);
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const screenPos = new Vector2(e.clientX - rect.left, e.clientY - rect.top);
+      const worldPos = this.renderer.screenToWorld(screenPos);
+
+      this.renderer.mouseScreenPos = screenPos;
+      this.renderer.mouseWorldPos = worldPos;
+
+      // Cleat hover checks
+      this.handleCanvasHover(screenPos, worldPos);
+
+      if (isMouseDown) {
+        const totalDist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+        if (totalDist > 6) {
+          isDragging = true;
+          const delta = new Vector2(e.clientX - dragStart.x, e.clientY - dragStart.y);
+          this.renderer.pan(delta);
+          dragStart.set(e.clientX, e.clientY);
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!isMouseDown) return;
+      isMouseDown = false;
+
+      // If user clicked (did not drag more than 6px total)
+      if (!isDragging) {
+        const rect = this.canvas.getBoundingClientRect();
+        const screenPos = new Vector2(e.clientX - rect.left, e.clientY - rect.top);
+        const worldPos = this.renderer.screenToWorld(screenPos);
+        this.handleCanvasClick(screenPos, worldPos);
+      }
+      isDragging = false;
+    });
+
+    // Zoom on wheel
+    this.canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const rect = this.canvas.getBoundingClientRect();
+      const screenPivot = new Vector2(e.clientX - rect.left, e.clientY - rect.top);
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+      this.renderer.zoom(zoomFactor, screenPivot);
+    }, { passive: false });
+  }
+
+  findLineAtScreen(screenPos, worldPos) {
+    let bestLine = null;
+    let bestDist = Infinity;
+
+    for (const line of this.mooringLines) {
+      const p1 = this.boat.getCleatWorldPos(line.boatCleatId);
+      const p2 = line.dockPos;
+
+      const s1 = this.renderer.worldToScreen(p1);
+      const s2 = this.renderer.worldToScreen(p2);
+
+      // Distance from screenPos to line segment s1-s2 in screen pixels
+      const ab = Vector2.sub(s2, s1);
+      const ap = Vector2.sub(screenPos, s1);
+      const abLenSq = ab.lengthSq();
+      let t = 0;
+      if (abLenSq > 0) {
+        t = Math.max(0, Math.min(1, ap.dot(ab) / abLenSq));
+      }
+
+      // Check distance to cleats at both ends (must be clicked away from a cleat!)
+      const distToCleat1 = screenPos.distanceTo(s1);
+      const distToCleat2 = screenPos.distanceTo(s2);
+      const lineLen = Math.sqrt(abLenSq);
+
+      // Safety margin away from cleat endpoints:
+      // Minimum 22px, or 25% of line length if line is short
+      const minEndMargin = Math.min(22, lineLen * 0.25);
+      if (distToCleat1 < minEndMargin || distToCleat2 < minEndMargin) {
+        continue; // Too close to cleat, do not treat as line click
+      }
+
+      const proj = new Vector2(s1.x + t * ab.x, s1.y + t * ab.y);
+      const dist = screenPos.distanceTo(proj);
+
+      if (dist < 18) { // within 18 screen pixels of the line body!
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestLine = line;
+        }
+      }
+    }
+    return bestLine;
+  }
+
+  handleCanvasHover(screenPos, worldPos) {
+    const hoveredCleat = this.findCleatAtScreen(screenPos, worldPos);
+    // Only search for hovered line if not over a cleat
+    const hoveredLine = !hoveredCleat ? this.findLineAtScreen(screenPos, worldPos) : null;
+
+    this.renderer.hoveredCleat = hoveredCleat;
+    this.renderer.hoveredBoatCleatId = hoveredCleat?.type === 'boat' ? hoveredCleat.id : null;
+    this.renderer.hoveredDockCleatId = hoveredCleat?.type === 'dock' ? hoveredCleat.id : null;
+    this.renderer.hoveredLineId = hoveredLine?.id || null;
+
+    if (hoveredCleat) {
+      this.canvas.style.cursor = 'pointer';
+    } else if (hoveredLine) {
+      this.canvas.style.cursor = 'pointer';
+    } else if (this.selectedCleat) {
+      this.canvas.style.cursor = 'crosshair';
+    } else {
+      this.canvas.style.cursor = 'grab';
+    }
+  }
+
+  setCleatSelection(cleat) {
+    this.selectedCleat = cleat;
+    this.renderer.selectedCleat = cleat;
+    this.renderer.selectedBoatCleatId = cleat.type === 'boat' ? cleat.id : null;
+  }
+
+  clearCleatSelection() {
+    this.selectedCleat = null;
+    this.renderer.selectedCleat = null;
+    this.renderer.selectedBoatCleatId = null;
+  }
+
+  handleCanvasClick(screenPos, worldPos) {
+    const statusBanner = document.getElementById('line-action-status');
+    const clickedCleat = this.findCleatAtScreen(screenPos, worldPos);
+
+    // ========================================================
+    // CASE 1: Clicked on a Cleat / Piling
+    // ========================================================
+    if (clickedCleat) {
+      // 1A. Clicked the exact same cleat again -> deselect / cancel
+      if (this.selectedCleat && this.selectedCleat.type === clickedCleat.type && this.selectedCleat.id === clickedCleat.id) {
+        this.clearCleatSelection();
+        if (statusBanner) statusBanner.classList.add('hidden');
+        return;
+      }
+
+      // 1B. Nothing selected yet -> select this cleat (ready to tie a line or double up!)
+      if (!this.selectedCleat) {
+        this.setCleatSelection(clickedCleat);
+        const attachedLines = this.mooringLines.filter(l =>
+          (clickedCleat.type === 'boat' && l.boatCleatId === clickedCleat.id) ||
+          (clickedCleat.type === 'dock' && l.dockId === clickedCleat.id)
+        );
+
+        if (statusBanner) {
+          const doubleUpHint = attachedLines.length > 0
+            ? ` (${attachedLines.length} line${attachedLines.length > 1 ? 's' : ''} attached — click opposite to double up)`
+            : '';
+          if (clickedCleat.type === 'boat') {
+            statusBanner.innerHTML = `<span class="prompt-glow">⚓ Selected: <strong>${clickedCleat.name}</strong>${doubleUpHint}. Click dock piling to tie line (or click water to cancel).</span>`;
+          } else {
+            statusBanner.innerHTML = `<span class="prompt-glow">⚓ Selected: <strong>${clickedCleat.name}</strong>${doubleUpHint}. Click boat cleat to tie line (or click water to cancel).</span>`;
+          }
+          statusBanner.classList.remove('hidden');
+        }
+        return;
+      }
+
+      // 1C. Clicked another cleat on the SAME side -> switch selection
+      if (this.selectedCleat.type === clickedCleat.type) {
+        this.setCleatSelection(clickedCleat);
+        const attachedLines = this.mooringLines.filter(l =>
+          (clickedCleat.type === 'boat' && l.boatCleatId === clickedCleat.id) ||
+          (clickedCleat.type === 'dock' && l.dockId === clickedCleat.id)
+        );
+        const doubleUpHint = attachedLines.length > 0
+          ? ` (${attachedLines.length} line${attachedLines.length > 1 ? 's' : ''} attached — click opposite to double up)`
+          : '';
+
+        if (statusBanner) {
+          statusBanner.innerHTML = `<span class="prompt-glow">Switched selection to <strong>${clickedCleat.name}</strong>${doubleUpHint}. Click opposite side to tie line.</span>`;
+        }
+        return;
+      }
+
+      // 1D. Clicked opposite side -> TIE LINE (allows doubling up on either cleat!)
+      const boatCleat = this.selectedCleat.type === 'boat' ? this.selectedCleat : clickedCleat;
+      const dockCleat = this.selectedCleat.type === 'dock' ? this.selectedCleat : clickedCleat;
+
+      this.lineManager.addLine(boatCleat.id, dockCleat.id, dockCleat.x, dockCleat.y, dockCleat.name);
+      this.clearCleatSelection();
+
+      if (statusBanner) {
+        statusBanner.innerHTML = `<span class="success-glow">✓ Secured line: <strong>${boatCleat.name}</strong> → <strong>${dockCleat.name}</strong>!</span>`;
+        setTimeout(() => {
+          if (!this.selectedCleat) {
+            statusBanner.classList.add('hidden');
+          }
+        }, 4000);
+      }
+      return;
+    }
+
+    // ========================================================
+    // CASE 2: Clicked on a Line in the Water (Away from Cleats)
+    // ========================================================
+    const clickedLine = this.findLineAtScreen(screenPos, worldPos);
+    if (clickedLine) {
+      this.lineManager.removeLine(clickedLine.id);
+      this.clearCleatSelection();
+
+      if (statusBanner) {
+        statusBanner.innerHTML = `<span class="warning-glow">✂ Cast off line: <strong>${clickedLine.name}</strong></span>`;
+        statusBanner.classList.remove('hidden');
+        setTimeout(() => {
+          if (!this.selectedCleat) statusBanner.classList.add('hidden');
+        }, 3500);
+      }
+      return;
+    }
+
+    // ========================================================
+    // CASE 3: Clicked into open water (NOT on a cleat, NOT on a line)
+    // ========================================================
+    if (this.selectedCleat) {
+      // Simply deselect / cancel cleat selection without removing any lines!
+      this.clearCleatSelection();
+      if (statusBanner) statusBanner.classList.add('hidden');
+    }
+  }
+
+  finishLineCreation(statusBanner, targetName) {
+    this.clearCleatSelection();
+    if (statusBanner) {
+      setTimeout(() => {
+        if (!this.selectedCleat) {
+          statusBanner.classList.add('hidden');
+        }
+      }, 4000);
+    }
+  }
+
+  loop(currentTime) {
+    requestAnimationFrame((t) => this.loop(t));
+
+    const rawDt = (currentTime - this.lastTime) / 1000;
+    this.lastTime = currentTime;
+    const dt = Math.min(rawDt, 0.05); // Cap to prevent large lag leaps
+
+    if (!this.isPaused) {
+      const effectiveDt = dt * this.simSpeed;
+
+      // Physics Sub-stepping (4 sub-steps per frame for rock-solid line and collision stability)
+      const subSteps = 4;
+      const subDt = effectiveDt / subSteps;
+
+      for (let s = 0; s < subSteps; s++) {
+        // 1. Process helm controls
+        this.helm.update(subDt);
+
+        // 2. Resolve collisions with finger pier and pilings
+        const collisionForces = this.collision.resolveCollisions(this.boat);
+
+        // 3. Compute mooring line elastic tension forces
+        const externalForces = [...collisionForces];
+        for (const line of this.mooringLines) {
+          const lineForce = line.computeForce(this.boat, subDt);
+          if (lineForce) {
+            externalForces.push(lineForce);
+          }
+        }
+
+        // 4. Step rigid body boat physics
+        this.boat.step(subDt, this.env, externalForces);
+      }
+
+      // Update environment animation timers
+      this.env.update(effectiveDt);
+
+      // Update effects renderer (particles, trail, bubbles)
+      this.renderer.effectsRenderer.update(effectiveDt, this.boat, this.env);
+    }
+
+    // Render Canvas
+    this.renderer.render(this.boat, this.env, this.mooringLines);
+
+    // Update UI HUD & Line meters
+    this.telemetryHUD.update();
+    this.lineManager.updateTensionMeters();
+  }
+}
+
+// Initialize when DOM is ready or immediately if already parsed
+function startApp() {
+  if (!window.simApp) {
+    window.simApp = new App();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startApp);
+} else {
+  startApp();
+}
+
+
+})();

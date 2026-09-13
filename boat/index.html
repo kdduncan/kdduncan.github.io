@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beneteau 331 Sailboat Docking & Slip Maneuvering Simulator</title>
+  <link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-title">
+      <h1>BENETEAU 331 DOCKING SIMULATOR</h1>
+      <span class="badge">Beta 25 Diesel | Single Screw | 1/3 Port Finger | 4 Pilings</span>
+    </div>
+
+    <div class="header-actions">
+      <button id="btn-sim-pause" class="btn-header" title="Pause or resume physics simulation [P]">⏸ Pause <span class="key-badge">P</span></button>
+      <button class="btn-header btn-sim-speed" data-speed="0.5" title="Slow motion (0.5x)">0.5x</button>
+      <button class="btn-header btn-sim-speed active" data-speed="1.0" title="Normal speed (1x)">1.0x</button>
+      <button class="btn-header btn-sim-speed" data-speed="2.0" title="Fast forward (2x)">2.0x</button>
+      <button id="btn-toggle-sound" class="btn-header" title="Toggle marine diesel engine audio">🔇 Sound: OFF</button>
+      <button id="btn-help" class="btn-header" title="Skipper's manual and physics guide">❓ Guide</button>
+    </div>
+  </header>
+
+  <!-- Main Simulator Layout -->
+  <main class="app-main">
+
+    <!-- Left Sidebar: Helm Controls & Practice Drills -->
+    <aside class="sidebar sidebar-left">
+      
+      <!-- Helm & Propulsion Panel -->
+      <!-- Helm & Propulsion Panel -->
+      <section class="panel-card">
+        <div class="panel-title">
+          <span>Helm & Steering</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted);">[A/D or Drag]</span>
+        </div>
+
+        <!-- Visual Wheel Widget -->
+        <div class="wheel-widget-container">
+          <div id="helm-wheel-graphic" class="helm-wheel-svg-wrap" title="Click & drag wheel to steer">
+            <svg id="svg-steering-wheel" viewBox="0 0 100 100" width="94" height="94">
+              <!-- Wheel Rim -->
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#90a4ae" stroke-width="4.5"/>
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#263238" stroke-width="1.2"/>
+              <!-- Center Hub -->
+              <circle cx="50" cy="50" r="12" fill="#eceff1" stroke="#263238" stroke-width="2.5"/>
+              <circle cx="50" cy="50" r="5" fill="#37474f"/>
+              <!-- Spokes -->
+              <line x1="50" y1="6" x2="50" y2="94" stroke="#cfd8dc" stroke-width="3"/>
+              <line x1="12" y1="28" x2="88" y2="72" stroke="#cfd8dc" stroke-width="3"/>
+              <line x1="12" y1="72" x2="88" y2="28" stroke="#cfd8dc" stroke-width="3"/>
+              <!-- King Spoke Red Marker (Top dead center) -->
+              <rect x="47" y="2" width="6" height="8" rx="1.5" fill="#ef5350"/>
+            </svg>
+          </div>
+          <div class="wheel-readout-wrap">
+            <div id="rudder-angle-val" class="wheel-angle-text">0° (Center)</div>
+            <div class="wheel-hint">A / D to steer • Space to center</div>
+          </div>
+        </div>
+
+        <!-- Slider -->
+        <div class="control-group" style="margin-top: 8px;">
+          <input type="range" id="rudder-slider" min="-35" max="35" step="1" value="0">
+        </div>
+
+        <!-- Rudder Quick Buttons -->
+        <div class="button-grid" style="grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px;">
+          <button class="btn-action small btn-rudder-quick" data-rudder="-35">Hard Port (-35°)</button>
+          <button id="btn-center-wheel" class="btn-action small btn-rudder-quick" data-rudder="0" style="font-weight: 700; border-color: var(--accent-cyan); color: var(--accent-cyan);">Center [Space]</button>
+          <button class="btn-action small btn-rudder-quick" data-rudder="35">Hard Stbd (+35°)</button>
+        </div>
+        <div class="button-grid" style="grid-template-columns: repeat(2, 1fr); gap: 4px; margin-top: 4px;">
+          <button class="btn-action small btn-rudder-quick" data-rudder="-15">Port 15°</button>
+          <button class="btn-action small btn-rudder-quick" data-rudder="15">Starboard 15°</button>
+        </div>
+
+        <!-- Throttle Control -->
+        <div class="panel-title" style="margin-top: 16px;">
+          <span>Beta 25 Diesel Throttle</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted);">[W/S Shift • N Neutral]</span>
+        </div>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <span>Throttle Position</span>
+            <span id="throttle-display-val" class="control-value" style="color: var(--accent-green);">FORWARD (20%)</span>
+          </div>
+          <input type="range" id="throttle-slider" min="-1.0" max="1.0" step="0.05" value="0.2">
+        </div>
+
+        <div class="button-grid" style="grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px;">
+          <button class="btn-action small btn-throttle-quick" data-throttle="-0.4">Reverse Walk</button>
+          <button id="btn-throttle-neutral" class="btn-action small btn-throttle-quick" data-throttle="0" style="font-weight: 700; border-color: var(--accent-gold); color: var(--accent-gold);">Neutral (0%)</button>
+          <button class="btn-action small btn-throttle-quick" data-throttle="0.2">Slow Ahead</button>
+        </div>
+        <div class="button-grid" style="grid-template-columns: repeat(2, 1fr); gap: 4px; margin-top: 4px;">
+          <button class="btn-action small btn-throttle-quick" data-throttle="-1.0">Full Reverse</button>
+          <button class="btn-action small btn-throttle-quick" data-throttle="0.5">Half Ahead (+50%)</button>
+        </div>
+      </section>
+
+      <!-- Practice Scenarios & Resets -->
+      <section class="panel-card">
+        <div class="panel-title">Scenarios & Maneuvers</div>
+        <div class="control-group">
+          <select id="scenario-select" class="select-styled">
+            <option value="calm_approach">1. Calm Fairway Approach</option>
+            <option value="port_crosswind">2. Port Crosswind (Wind Blowing Off Finger)</option>
+            <option value="starboard_crosswind">3. Starboard Crosswind (Wind Blowing Onto Finger)</option>
+            <option value="spring_line_drill">4. Spring Line Snubbing Drill (Port Midship)</option>
+            <option value="backing_out">5. Backing Out of Slip (Prop Walk Challenge)</option>
+            <option value="tied_in_slip">6. Tied In Slip (Gale Wind & Current Test)</option>
+          </select>
+        </div>
+
+        <div class="button-grid">
+          <button id="btn-reset-approach" class="btn-action">Reset Fairway Approach</button>
+          <button id="btn-reset-slip" class="btn-action">Reset Tied in Slip</button>
+        </div>
+      </section>
+
+      <!-- Camera & Diagnostics View -->
+      <section class="panel-card">
+        <div class="panel-title">Display & Camera</div>
+        <div class="control-group">
+          <div class="control-label-row">
+            <span>Camera View Mode</span>
+          </div>
+          <select id="camera-mode-select" class="select-styled">
+            <option value="follow">Follow Boat (Dynamic Tracking)</option>
+            <option value="dock">Slip Overview (Fixed Marina View)</option>
+            <option value="free">Free Pan & Zoom</option>
+          </select>
+        </div>
+
+        <div class="button-grid" style="margin-bottom: 6px;">
+          <button id="btn-locate-boat" class="btn-action small" title="Center camera directly on sailboat">📍 Locate Boat</button>
+          <button id="btn-fit-view" class="btn-action small" title="Frame both sailboat and slip on screen">🔍 Fit Boat & Slip</button>
+        </div>
+
+        <div class="button-grid">
+          <button id="toggle-vectors" class="btn-action small active">Force Vectors: ON</button>
+          <button id="toggle-trail" class="btn-action small active">Path Trail: ON</button>
+        </div>
+        <small style="display: block; margin-top: 8px; color: var(--text-muted); font-size: 0.72rem;">
+          Tip: Use mouse wheel to Zoom in/out, click & drag background to Pan.
+        </small>
+      </section>
+
+    </aside>
+
+    <!-- Center Viewport / Canvas -->
+    <div class="viewport-center">
+      
+      <!-- Floated Skipper Coaching Banner -->
+      <div id="coach-tip-banner" class="coach-banner">
+        <span id="coach-tip-text"><strong>Fairway Approach:</strong> Line up into the slip. Use W/S for throttle, A/D for wheel. Click cleats to tie mooring lines to pilings or finger pier.</span>
+      </div>
+
+      <!-- Floated Line Attachment Status Prompt -->
+      <div id="line-action-status" class="line-status-banner hidden"></div>
+
+      <!-- Canvas Quick Navigation Toolbar -->
+      <div class="canvas-quick-bar">
+        <button id="btn-quick-pause" class="btn-canvas-quick" title="Pause or resume simulation [P]">⏸ Pause</button>
+        <button id="btn-quick-boat" class="btn-canvas-quick" title="Center camera directly on sailboat">📍 Center Boat</button>
+        <button id="btn-quick-dock" class="btn-canvas-quick" title="Show slip, pilings and finger pier">⚓ Slip View</button>
+        <button id="btn-quick-fit" class="btn-canvas-quick" title="Fit both sailboat and slip in view">🔍 Fit All</button>
+        <button id="btn-quick-reset" class="btn-canvas-quick" title="Reset fairway approach">🔄 Reset Approach</button>
+      </div>
+
+      <!-- Main Canvas -->
+      <canvas id="sim-canvas"></canvas>
+
+      <!-- Floated Marine Multi-Function Display (MFD) HUD -->
+      <div class="hud-mfd-container">
+        
+        <div class="mfd-gauge">
+          <span class="mfd-label">SOG (Knots)</span>
+          <span id="hud-sog" class="mfd-value">1.2</span>
+        </div>
+
+        <div class="mfd-gauge">
+          <span class="mfd-label">STW (Knots)</span>
+          <span id="hud-stw" class="mfd-value">1.2</span>
+        </div>
+
+        <div class="mfd-gauge">
+          <span class="mfd-label">Heading</span>
+          <span id="hud-hdg" class="mfd-value">000°</span>
+        </div>
+
+        <div class="mfd-gauge">
+          <span class="mfd-label">COG</span>
+          <span id="hud-cog" class="mfd-value">000°</span>
+        </div>
+
+        <div class="mfd-gauge">
+          <span class="mfd-label">Rudder Angle</span>
+          <div class="rudder-indicator-wrap">
+            <span id="hud-rudder-val" class="mfd-value" style="font-size: 0.95rem;">0°</span>
+            <div class="rudder-bar-track">
+              <div id="hud-rudder-bar"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mfd-gauge">
+          <span class="mfd-label">Beta 25 Engine</span>
+          <span id="hud-gear" class="gear-badge fwd">FORWARD</span>
+        </div>
+
+        <div class="mfd-gauge">
+          <span class="mfd-label">Tachometer</span>
+          <span id="hud-rpm" class="mfd-value" style="font-size: 0.95rem; color: var(--accent-gold);">1400 RPM</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Right Sidebar: Environment & Mooring Lines -->
+    <aside class="sidebar sidebar-right">
+
+      <!-- Wind & Current Settings -->
+      <section class="panel-card">
+        <div class="panel-title">Environmental Conditions</div>
+
+        <!-- True Wind -->
+        <div class="control-group">
+          <div class="control-label-row">
+            <span>True Wind Speed</span>
+            <span id="wind-speed-val" class="control-value">10 kts</span>
+          </div>
+          <input type="range" id="wind-speed" min="0" max="35" step="1" value="10">
+        </div>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <span>True Wind Direction (From)</span>
+            <span id="wind-dir-val" class="control-value">270° (W)</span>
+          </div>
+          <input type="range" id="wind-dir" min="0" max="359" step="5" value="270">
+        </div>
+
+        <!-- Current -->
+        <div class="control-group" style="margin-top: 12px;">
+          <div class="control-label-row">
+            <span>Current Speed (Tidal Drift)</span>
+            <span id="current-speed-val" class="control-value">0.5 kts</span>
+          </div>
+          <input type="range" id="current-speed" min="0" max="4" step="0.1" value="0.5">
+        </div>
+
+        <div class="control-group">
+          <div class="control-label-row">
+            <span>Current Direction (Towards)</span>
+            <span id="current-dir-val" class="control-value">000° (N)</span>
+          </div>
+          <input type="range" id="current-dir" min="0" max="359" step="5" value="0">
+        </div>
+
+        <!-- Quick Weather Presets -->
+        <div class="panel-title" style="margin-top: 14px; font-size: 0.74rem;">Weather Presets</div>
+        <div class="button-grid">
+          <button class="btn-action small btn-weather-preset" data-preset="calm">Calm (0 kts)</button>
+          <button class="btn-action small btn-weather-preset" data-preset="port_crosswind">Port Crosswind (Off)</button>
+          <button class="btn-action small btn-weather-preset" data-preset="starboard_crosswind">Stbd Crosswind (On)</button>
+          <button class="btn-action small btn-weather-preset" data-preset="headwind">Headwind (18 kts)</button>
+          <button class="btn-action small btn-weather-preset" data-preset="strong_current">Cross Current</button>
+          <button class="btn-action small btn-weather-preset" data-preset="gale_test">Gale Wind (28 kts)</button>
+        </div>
+      </section>
+
+      <!-- Mooring Lines & Cleats Panel -->
+      <section class="panel-card" style="flex: 1; display: flex; flex-direction: column;">
+        <div class="panel-title">
+          <span>Mooring Lines & Cleats</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted);">Interactive</span>
+        </div>
+
+        <p style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.35;">
+          Click any boat cleat on screen, then click a piling or finger pier cleat to tie a line. Adjust rest lengths to see load shifts.
+        </p>
+
+        <!-- Active Lines List -->
+        <div id="active-lines-list" class="active-lines-container"></div>
+
+        <!-- Mooring Presets -->
+        <div class="panel-title" style="font-size: 0.74rem; margin-top: 8px;">Mooring Presets</div>
+        <div class="button-grid">
+          <button id="btn-preset-standard" class="btn-action small">Standard 4-Line Tie</button>
+          <button id="btn-preset-spring" class="btn-action small">Port Midship Spring</button>
+          <button id="btn-preset-full" class="btn-action small">Full Moor + Springs</button>
+          <button id="btn-clear-lines" class="btn-action small" style="color: var(--accent-red);">Cast Off All</button>
+        </div>
+      </section>
+
+    </aside>
+
+  </main>
+
+  <!-- Help & Sailing Physics Guide Modal -->
+  <div id="help-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Skipper's Docking Guide: Beneteau 331</h2>
+        <button id="btn-close-help" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h3>1. Single-Screw Handling & Beta 25 Engine</h3>
+        <ul>
+          <li><strong>Prop Wash in Forward:</strong> In forward gear, the propeller discharges a high-velocity stream of water directly past the spade rudder. You can steer or "kick the stern" by giving a brief pulse of forward throttle with the wheel turned, even with zero forward boat speed!</li>
+          <li><strong>Prop Walk in Reverse:</strong> When in reverse, the right-hand propeller acts like a paddlewheel against the hull, pulling the stern firmly to <strong>PORT</strong>. This means when backing into or out of the slip, your bow swings starboard. Steerage in reverse only takes effect once the boat gains sternway through the water.</li>
+          <li><strong>Neutral Steerage:</strong> In neutral, the rudder blade only works if water is moving past the hull (Speed Through Water). As soon as the boat stops, rudder authority vanishes.</li>
+        </ul>
+
+        <h3>2. Slip Geometry & The Short Port Finger Pier</h3>
+        <ul>
+          <li><strong>1/3 Finger Pier:</strong> The finger pier on your port side extends only about one-third of the boat length (~11.5 ft / 3.5 m). Your bow and midship are supported, but the aft two-thirds of the boat overhangs into the fairway past the finger pier!</li>
+          <li><strong>The Four Pilings:</strong> Two outer pilings mark the slip mouth, and two inner pilings anchor the head dock. Outer pilings are ideal for stern lines to prevent the stern from swinging out.</li>
+          <li><strong>Spring Line Snubbing:</strong> In crosswinds or when docking solo, running a line from your <strong>Port Midship Spring Cleat</strong> to the <strong>Finger Pier End Cleat</strong> and motoring gently forward with the wheel turned away from the dock will snug the boat perfectly against the pier fenders.</li>
+        </ul>
+
+        <h3>3. Wind, Current & Leeway Dynamics</h3>
+        <ul>
+          <li><strong>Bow Blow-Off:</strong> Sailboats have high bow freeboard and low cockpits. When drifting at low speed, the wind blows the bow downwind much faster than the stern. Always maintain just enough headway to maintain steerage until your spring or bow line is attached.</li>
+          <li><strong>Tidal Current:</strong> Current pushes the entire water column. Watch the Course Over Ground (COG) vs Heading (HDG) to compensate with crab angle.</li>
+        </ul>
+
+        <h3>Controls Quick Reference</h3>
+        <ul>
+          <li><span class="key-badge">W</span> or <span class="key-badge">▲</span>: Shift Forward (Step Up Detents: Neutral $\rightarrow$ 20% $\rightarrow$ 40% $\rightarrow$ 65% $\rightarrow$ 100%)</li>
+          <li><span class="key-badge">S</span> or <span class="key-badge">▼</span>: Shift Neutral / Reverse (Step Down Detents: Forward $\rightarrow$ Neutral $\rightarrow$ Reverse Walk $\rightarrow$ Full Reverse)</li>
+          <li><span class="key-badge">N</span>: Instant Neutral Detent (0%)</li>
+          <li><span class="key-badge">Space</span>: Instant Center Wheel (0°)</li>
+          <li><span class="key-badge">A</span> / <span class="key-badge">D</span> or <span class="key-badge">◀</span> / <span class="key-badge">▶</span>: Wheel Turn Port / Starboard</li>
+          <li><strong>Mouse Wheel on Helm:</strong> Fine tune steering wheel angle</li>
+          <li><strong>Mouse Click:</strong> Click boat cleat & dock piling to tie line</li>
+          <li><strong>Mouse Wheel on Sea:</strong> Zoom in / out</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Universal Standalone Simulator Script (Works on both http:// and file:///) -->
+  <script src="js/bundle.js?v=4"></script>
+</body>
+</html>
