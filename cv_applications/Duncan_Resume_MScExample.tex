@@ -1,0 +1,159 @@
+% LaTeX Curriculum Vitae Template
+%
+% Copyright (C) 2004-2009 Jason Blevins <jrblevin@sdf.lonestar.org>
+% http://jblevins.org/projects/cv-template/
+%
+% You may use use this document as a template to create your own CV
+% and you may redistribute the source code freely. No attribution is
+% required in any resulting documents. I do ask that you please leave
+% this notice and the above URL in the source code if you choose to
+% redistribute this file.
+
+\documentclass[letterpaper]{article}
+
+\usepackage{hyperref}
+\usepackage{geometry}
+
+% Comment the following lines to use the default Computer Modern font
+% instead of the Palatino font provided by the mathpazo package.
+% Remove the 'osf' bit if you don't like the old style figures.
+\usepackage[T1]{fontenc}
+\usepackage[sc,osf]{mathpazo}
+
+% Set your name here
+\def\name{Kevin D. Duncan}
+
+% Replace this with a link to your CV if you like, or set it empty
+% (as in \def\footerlink{}) to remove the link in the footer:
+\def\footerlink{http://jblevins.org/projects/cv-template/}
+
+% The following metadata will show up in the PDF properties
+\hypersetup{
+  colorlinks = true,
+  urlcolor = black,
+  pdfauthor = {\name},
+  pdfkeywords = {economics, statistics},
+  pdftitle = {\name: Curriculum Vitae},
+  pdfsubject = {Curriculum Vitae},
+  pdfpagemode = UseNone
+}
+
+\geometry{
+  body={6.5in, 8.5in},
+  left=0.5in,
+  right=0.5in,
+  top=0.5in,
+  bottom = 0.5in
+}
+
+
+% Customize page headers
+\pagestyle{myheadings}
+\markright{\name}
+\thispagestyle{empty}
+
+% Custom section fonts
+\usepackage{sectsty}
+\sectionfont{\sffamily\mdseries\Large}
+\subsectionfont{\sffamily\mdseries\itshape\large}
+
+\usepackage{enumitem}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection}{1em}{}[{\titlerule[0.8pt]}]
+
+% Other possible font commands include:
+% \ttfamily for teletype,
+% \sffamily for sans serif,
+% \bfseries for bold,
+% \scshape for small caps,
+% \normalsize, \large, \Large, \LARGE sizes.
+
+% Don't indent paragraphs.
+\setlength\parindent{0em}
+
+\renewcommand\labelenumi{}
+
+% Make lists without bullets
+\renewenvironment{itemize}{
+  \begin{list}{}{
+    \setlength{\leftmargin}{0em}
+  }
+}{
+  \end{list}
+}
+
+
+\newcommand{\degree}[3]{#1,\ #2\quad#3\par}
+
+\setlist[itemize]{leftmargin=*}
+
+\begin{document}
+
+% Place name at left
+{\huge \name} \makebox[.65\textwidth][r]{\begin{minipage}{0.45\textwidth}
+  \begin{tabular}{ll} \\
+    Phone: & (XXX) XXX-XXXX\\
+    Email: & \href{mailto:XXXX@fhfa.gov}{\tt XXXX@XXXX.xxx} \\
+    Last updated: & March 2014 \\
+  \end{tabular}
+\end{minipage}}
+
+% Alternatively, print name centered and bold:
+%\centerline{\huge \bf \name}
+
+\vspace{0.0in}
+
+%\begin{minipage}{0.45\linewidth}
+%  \href{http://www.unc.edu/}{Iowa State University} \\
+%  Department of Economics \\
+%  Heady Hall \\
+%  Ames IA, 50014
+%\end{minipage}
+
+
+\section*{Education}
+
+\begin{tabular}{@{}llll}
+    2014 & MSc & Economics &Iowa State University \\
+  2011 & BSc & Economics \& Political Science & The George Washington University
+\end{tabular}
+
+\section*{Employment}
+
+\begin{tabular}{@{}llll}
+  Spring 2012 & Adjunct Fellow & Tax Foundation \\
+  Summer-Fall 2011 & Summer Intern & Koch Institute \& GWU Regulatory Studies Center \\
+\end{tabular}
+
+
+\section*{Quantitative Experience}
+\subsection*{Analytical Skillset}
+\begin{itemize}
+\item Strong mathematical background: completed coursework in real analysis I-II, linear algebra, and differential equations. 
+\item Nominated by my professors to be upgraded into the PhD in Economics program starting Fall 2013 for exemplary performance in MSc program.
+\item Evaluated the impacts of 9 top marginal tax rates on establishment entry, exit, employment expansion, and employment contraction from 2000 to 2016 using a border-difference estimator in Stata (Master's thesis).
+\end{itemize}
+\subsection*{Technical Skillset}
+\begin{itemize}
+\item Currently engaged in masters level coursework in economics courses, and advanced undergraduate mathematics and computer science courses. Exposure and experience using Stata, R, Java, and ArcGIS. 
+\item Training in masters level econometrics and mathematical statistics courses.
+\item Published an article evaluating the forecast performance of state level business climate indices as published by think tanks and professional organizations on future county and state level growth using a border-difference estimator.
+\item Linked DC Liquor licenses to relevant regulatory district in ArcGIS, estimated a model of liquor licensings being put in place using a panel Probit model. Further estimated the impacts of local characteristics on total liquor licenses accounting for Heckman selection in a local hold being in place.
+\end{itemize}
+\subsection*{Communications Skillset}
+\begin{itemize}
+\item Experience presenting to undergraduate students as a teaching assistant.
+\item Invited presentation on the economics of sorting for advanced course on economic discrimination, including sorting models programmed in Java and NetLogo.
+\item Experience presenting ongoing research to both peer stake holders in economic conferences, as well as policy and stakeholder levels via experience interning at think tanks.
+\item Wrote blog posts and opinion editorials published online at nationally recognized outlets.
+\end{itemize}
+
+\section*{Other Experience}
+\begin{itemize}
+\item Omicron Delta Epsilon honors, department tutor for the GWU Department of Economics, including calculus intensive microeconomics and macroeconomics, and econometrics.
+\item Iowa State University Department of Economics Computer Committee. Wrote \$25,000 grant to improve student server cluster that was approved in a competitive merit based application pool.
+\end{itemize}
+
+\end{document}

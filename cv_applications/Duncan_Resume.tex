@@ -1,0 +1,246 @@
+% LaTeX Curriculum Vitae Template
+%
+% Copyright (C) 2004-2009 Jason Blevins <jrblevin@sdf.lonestar.org>
+% http://jblevins.org/projects/cv-template/
+%
+% You may use use this document as a template to create your own CV
+% and you may redistribute the source code freely. No attribution is
+% required in any resulting documents. I do ask that you please leave
+% this notice and the above URL in the source code if you choose to
+% redistribute this file.
+
+\documentclass[letterpaper]{article}
+
+\usepackage{hyperref}
+\usepackage{geometry}
+
+\usepackage{enumitem} % itemize seperation
+% Comment the following lines to use the default Computer Modern font
+% instead of the Palatino font provided by the mathpazo package.
+% Remove the 'osf' bit if you don't like the old style figures.
+\usepackage[T1]{fontenc}
+\usepackage[sc,osf]{mathpazo}
+
+% Set your name here
+\def\name{Kevin D. Duncan}
+
+% Replace this with a link to your CV if you like, or set it empty
+% (as in \def\footerlink{}) to remove the link in the footer:
+\def\footerlink{http://jblevins.org/projects/cv-template/}
+
+% The following metadata will show up in the PDF properties
+\hypersetup{
+  colorlinks = true,
+  urlcolor = black,
+  pdfauthor = {\name},
+  pdfkeywords = {economics, statistics},
+  pdftitle = {\name: Curriculum Vitae},
+  pdfsubject = {Curriculum Vitae},
+  pdfpagemode = UseNone
+}
+
+\geometry{
+  body={6.5in, 8.5in},
+  left=1.0in,
+  top=1.25in
+}
+
+
+% Customize page headers
+\pagestyle{myheadings}
+\markright{\name}
+\thispagestyle{empty}
+
+% Custom section fonts
+\usepackage{sectsty}
+\sectionfont{\sffamily\mdseries\Large}
+\subsectionfont{\sffamily\mdseries\itshape\large}
+
+\usepackage{enumitem}
+
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries}{\thesection}{1em}{}[{\titlerule[0.8pt]}]
+
+% Other possible font commands include:
+% \ttfamily for teletype,
+% \sffamily for sans serif,
+% \bfseries for bold,
+% \scshape for small caps,
+% \normalsize, \large, \Large, \LARGE sizes.
+
+% Don't indent paragraphs.
+\setlength\parindent{0em}
+
+% Make lists without bullets
+%\renewenvironment{itemize}{
+%  \begin{list}{}{
+%    \setlength{\leftmargin}{0em}
+%  }
+%}{
+%  \end{list}
+%}
+
+\newcommand{\degree}[3]{#1,\ #2\quad#3\par}
+
+\setlist[itemize]{leftmargin=*}
+
+\begin{document}
+
+% Place name at left
+{\huge \name}
+
+% Alternatively, print name centered and bold:
+%\centerline{\huge \bf \name}
+
+%\vspace{0.25in}
+
+\begin{minipage}{0.45\linewidth}
+  \href{http://www.unc.edu/}{Iowa State University} \\
+  Department of Economics \\
+  Heady Hall \\
+  Ames IA, 50014
+\end{minipage}
+\begin{minipage}{0.45\linewidth}
+  \begin{tabular}{ll}
+    Office & 80A Heady Hall \\
+    Phone: & (978) 390-3459 \\
+    Email: & \href{mailto:kdduncan@iastate.edu}{\tt kdduncan@iastate.edu} \\
+    Homepage: & \href{kdduncan.github.io/}{\tt kdduncan.github.io/} \\
+    Last updated: & \today \\
+  \end{tabular}
+\end{minipage}
+
+
+\section*{Education}
+
+\begin{tabular}{@{}llll}
+  (Expected) 2013-May 2020  & Ph.D. &Economics &Iowa State University \\
+    2012-2015 &M.S. &Economics &Iowa State University \\
+  2011 & B.S. &Economics \& Public Policy &The George Washington University
+\end{tabular}
+
+\section*{Experience}
+
+August 2012-Present: Graduate Student, Iowa State University, Ames, IA 50014 \\
+\begin{itemize}[noitemsep]
+\item Performed research in urban and regional economics along with econometric methods for causal inference and panel data
+\item Carried out economic analysis of the Capital Purchase Program of county level firm entry, firm exit, employment expansion, and employment contraction
+\item Planned and synthesized FFIEC Call Report data into useable data products for future projects in regional economics, determined broader data processing and analysis needs for projection completion
+\item  Developed novel econometric techniques for joint hypothesis testing over additive fixed effects and individual varying slope coefficients
+\item Estimated the impact of state tax policy on firm entry along state borders 
+\item Published paper with co-authors on whether or not state business climate indices predicted future economic growth, including aiding with multiple revision requests
+\item Presented multiple papers at regional economic conferences
+\item Set up student seminar series and summer reading groups for professors and fellow graduate students
+\item Provided peer comments to students conducting survey work to ensure surveys identified relevant economic effects
+\end{itemize}
+January - May 2018: Adjunct Instructor, Des Moines Area Community College, Ankeny IA \\
+\begin{itemize}[noitemsep]
+\item Hours per week: 20
+\item Salary: \$2700 per class
+\item Lead instructor for 2 sections Introductory Microeconomics
+\item Developed syllabi and teaching materials, prepared and presented lectures, recitation section, and supplementary learning time for low performing students
+\item Sought out peer and student feedback and evaluations, changing teaching methods to maximize student outcomes
+\end{itemize}
+August 2012- August 2015, Teaching Assistant, Iowa State University, Ames IA 50014\\
+\begin{itemize}[noitemsep]
+\item Hours per week: 20 
+\item Salary: \$22000 per year
+\item 3 years Introductory Microeconomics, 2 years Introductory Macroeconomics
+\item Lead TA for Economics of Discrimination, including stand alone lectures on sorting and market based segregation
+\end{itemize}
+2010-2011, Tutor, The George Washington University, Washington DC
+
+\section*{Research}
+
+\subsection*{Journal Articles}
+
+\begin{itemize}
+\item ``Do State Business Climate Indicators Explain Relative Economic Growth at State Borders?'' \textit{with Georgeanne Artz, Peter Orazem, and Arthur Hall}, Journal of Regional Science, Vol. 56, No. 3, 2016, pp. 395-419
+\end{itemize}
+
+\subsection*{Working Papers}
+
+\begin{itemize}
+\item ``The Capital Purchase Program's Effect on Firm Entry over the Business Cycle'' [Job Market Paper]
+\item ``Linear Hypothesis Tests over Fixed Effects with Serially Correlated Panels''
+\item ``Impact of Taxes on Firm Location Along State Borders,'' \textit{with Georgeanne Artz and Peter Orazem}
+\end{itemize}
+
+\section*{Awards \& Honors}
+
+\begin{itemize}
+  \item Fall 2010, Omicron Delta Epsilon, International Economics Honor Society
+\end{itemize}
+
+\section*{Grants \& Fellowships}
+
+
+\begin{itemize}
+\item 2015 Wayne W. Gross Graduate Fellowship
+\item 2015 \textit{with Zhylyevskyy, Oleksandr; Jorgensen, Christopher; Long, Michael}, ''Graduate Student Server Upgrades in Heady Hall,'' Iowa State University College of Liberal Arts and Sciences Computation Advisory Committee Grant (\$25,908.92)
+\end{itemize}
+\section*{Conference Presentations}
+
+
+\begin{itemize}
+\item Midwest Economics Association (2019)
+\item Midwest Economics Association (2016)
+\item Southern Economics Association (2015), Missouri Valley Economics Association (2015)
+\item Midwest Economics Association (2014)
+\end{itemize}
+
+\section*{University and Department Service}
+
+\begin{itemize}
+\item 2016- 2017 Economics Graduate Student Association Treasurer
+\item 2015- 2017 Graduate Student Seminar Coordinator
+\begin{itemize}
+\item Arranged and implemented a weekly graduate student seminar
+\item Provided space for graduate students to present work in low stress casual environments
+  \end{itemize}
+\item 2015- 2016 ISU Graduate College Peer Mentor
+\begin{itemize}
+\item Provided monthly time to meet with new graduate student from an underrepresented group
+\end{itemize}
+\item 2014- 2016 Economics Department Computer Committee
+\end{itemize}
+
+\section*{References}
+\begin{minipage}{0.45\linewidth}
+ Helle Bunzel (Primary Advisor) \\
+    Associate Professor\\
+    Department of Economics\\
+    Iowa State University\\
+    Ames, IA 50011\\
+    (515) 294-6163\\
+    hbunzel@iastate.edu
+\end{minipage}
+\begin{minipage}{0.45\linewidth}
+Peter Orazem\\
+    University Professor of Economics\\
+    Department of Economics\\
+    Iowa State University\\
+    Ames, IA 50011\\
+    (515) 294-8656\\
+    pfo@iastate.edu
+\end{minipage}
+
+\bigskip
+
+\begin{minipage}{0.45\linewidth}
+Ot\'avio Bartalotti\\
+    Assistant Professor of Economics\\
+    Department of Economics\\
+    Iowa State University\\
+    Ames, IA 50011\\
+    (515) 294-1085 \\
+    bartalot@iastate.edu
+
+\end{minipage}
+\bigskip
+
+
+
+
+\end{document}
